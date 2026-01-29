@@ -1,0 +1,394 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DataTable from "../components/DataTable.astro";
+import { db, Catalog } from "astro:db";
+import { CATALOGS } from "../shared/constants";
+import { parseTableQuery, buildTableResponse } from "../shared/table";
+import { eq, like, desc, asc, sql, or } from "astro:db";
+
+const { cookies, redirect, url } = Astro;
+
+// Check if user is logged in
+const userId = cookies.get("user-id");
+
+if (!userId) {
+    return redirect("/login?error=Please login to access catalogs");
+}
+
+// Parse query parameters
+const query = parseTableQuery(url);
+const { page = 1, pageSize = 10, sortBy, sortOrder = 'asc', search } = query;
+const offset = (page - 1) * pageSize;
+
+// Build query
+let catalogQuery: any = db.select().from(Catalog);
+let countQuery: any = db.select({ count: sql<number>`count(*)` }).from(Catalog);
+
+// Apply search
+if (search) {
+    const searchCondition = or(
+        like(Catalog.key, `%${search}%`),
+        like(Catalog.value, `%${search}%`)
+    );
+    catalogQuery = catalogQuery.where(searchCondition);
+    countQuery = countQuery.where(searchCondition);
+}
+
+// Apply sorting
+if (sortBy) {
+    const orderFn = sortOrder === 'desc' ? desc : asc;
+    if (sortBy === 'id') {
+        catalogQuery = catalogQuery.orderBy(orderFn(Catalog.id));
+    } else if (sortBy === 'type') {
+        catalogQuery = catalogQuery.orderBy(orderFn(Catalog.type));
+    } else if (sortBy === 'key') {
+        catalogQuery = catalogQuery.orderBy(orderFn(Catalog.key));
+    } else if (sortBy === 'value') {
+        catalogQuery = catalogQuery.orderBy(orderFn(Catalog.value));
+    } else {
+        catalogQuery = catalogQuery.orderBy(desc(Catalog.id));
+    }
+} else {
+    catalogQuery = catalogQuery.orderBy(desc(Catalog.id));
+}
+
+// Apply pagination
+catalogQuery = catalogQuery.limit(pageSize).offset(offset);
+
+// Execute queries
+const [catalogs, countResult] = await Promise.all([
+    catalogQuery,
+    countQuery,
+]);
+
+const totalCount = countResult[0]?.count || 0;
+const response = buildTableResponse(catalogs, totalCount, query);
+
+// Get catalog type name
+const getTypeName = (type: number): string => {
+    const entries = Object.entries(CATALOGS);
+    const found = entries.find(([_, value]) => value === type);
+    return found ? found[0] : `Type ${type}`;
+};
+
+// Define columns
+const columns = [
+    {
+        key: 'id',
+        label: 'ID',
+        sortable: true,
+        className: 'font-mono text-xs',
+        width: '80px',
+    },
+    {
+        key: 'type',
+        label: 'Type',
+        sortable: true,
+        render: (value: any) => getTypeName(value),
+    },
+    {
+        key: 'key',
+        label: 'Key',
+        sortable: true,
+        filterable: true,
+    },
+    {
+        key: 'value',
+        label: 'Value',
+        sortable: true,
+        filterable: true,
+    },
+    {
+        key: 'status',
+        label: 'Status',
+        render: (value: any) => {
+            const status = value || 'active';
+            const isDeleted = status === 'deleted';
+            const isNew = status === 'new';
+            const bgColor = isDeleted 
+                ? 'rgb(254 226 226)' 
+                : isNew 
+                    ? 'rgb(219 234 254)' 
+                    : 'rgb(220 252 231)';
+            const textColor = isDeleted 
+                ? 'rgb(153 27 27)' 
+                : isNew 
+                    ? 'rgb(30 64 175)' 
+                    : 'rgb(22 101 52)';
+            return `<span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background-color: ${bgColor}; color: ${textColor};">${status}</span>`;
+        },
+    },
+];
+
+// Define actions
+const actions = [
+    {
+        label: 'Edit',
+        action: 'edit',
+        icon: '✏️',
+        variant: 'secondary' as const,
+        onClick: 'editCatalog',
+    },
+    {
+        label: 'Delete',
+        action: 'delete',
+        icon: '🗑️',
+        variant: 'danger' as const,
+        onClick: 'deleteCatalog',
+    },
+];
+---
+
+<Layout title="Catalogs">
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <div class="mb-6">
+                <button
+                    id="addCatalogBtn"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                    Add Catalog Entry
+                </button>
+            </div>
+            <DataTable
+                title="Catalogs"
+                description="Manage system catalogs and their values"
+                data={response.data}
+                columns={columns}
+                totalCount={response.totalCount}
+                currentPage={response.currentPage}
+                pageSize={response.pageSize}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                searchQuery={search}
+                baseUrl="/catalogs"
+                actions={actions}
+                showSearch={true}
+                showExport={true}
+                showColumnToggle={true}
+            />
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div
+        id="catalogModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+    >
+        <div
+            class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white"
+        >
+            <div class="mt-3">
+                <h3
+                    class="text-lg font-medium text-gray-900 mb-4"
+                    id="modalTitle"
+                >
+                    Add Catalog Entry
+                </h3>
+                <form id="catalogForm" class="space-y-4">
+                    <input type="hidden" id="catalogId" />
+                    <div>
+                        <label
+                            for="catalogType"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Type
+                        </label>
+                        <select
+                            id="catalogType"
+                            name="type"
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                            <option value="">Select a type</option>
+                            {
+                                Object.entries(CATALOGS).map(
+                                    ([name, value]) => (
+                                        <option value={value}>{name}</option>
+                                    ),
+                                )
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            for="catalogKey"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Key
+                        </label>
+                        <input
+                            type="text"
+                            id="catalogKey"
+                            name="key"
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="e.g., ACTIVE"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            for="catalogValue"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Value
+                        </label>
+                        <input
+                            type="text"
+                            id="catalogValue"
+                            name="value"
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="e.g., Active"
+                        />
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            id="cancelBtn"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import { actions } from "astro:actions";
+    import { navigate } from "astro:transitions/client";
+
+    const modal = document.getElementById("catalogModal");
+    const form = document.getElementById("catalogForm") as HTMLFormElement;
+    const modalTitle = document.getElementById("modalTitle");
+    const catalogIdInput = document.getElementById(
+        "catalogId",
+    ) as HTMLInputElement;
+    const catalogTypeInput = document.getElementById(
+        "catalogType",
+    ) as HTMLSelectElement;
+    const catalogKeyInput = document.getElementById(
+        "catalogKey",
+    ) as HTMLInputElement;
+    const catalogValueInput = document.getElementById(
+        "catalogValue",
+    ) as HTMLInputElement;
+
+    // Add button
+    document.getElementById("addCatalogBtn")?.addEventListener("click", () => {
+        if (
+            modal &&
+            modalTitle &&
+            catalogIdInput &&
+            catalogTypeInput &&
+            catalogKeyInput &&
+            catalogValueInput
+        ) {
+            modalTitle.textContent = "Add Catalog Entry";
+            catalogIdInput.value = "";
+            catalogTypeInput.value = "";
+            catalogKeyInput.value = "";
+            catalogValueInput.value = "";
+            catalogTypeInput.disabled = false;
+            modal.classList.remove("hidden");
+        }
+    });
+
+    // Edit function - called from DataTable actions
+    (window as any).editCatalog = async (id: number) => {
+        // Fetch catalog data
+        const { data, error } = await actions.getCatalog({ id });
+        if (error || !data?.data || data.data.length === 0) {
+            alert(error?.message || "Failed to fetch catalog entry");
+            return;
+        }
+
+        const catalog = data.data[0];
+        if (
+            modal &&
+            modalTitle &&
+            catalogIdInput &&
+            catalogTypeInput &&
+            catalogKeyInput &&
+            catalogValueInput
+        ) {
+            modalTitle.textContent = "Edit Catalog Entry";
+            catalogIdInput.value = String(catalog.id);
+            catalogTypeInput.value = String(catalog.type);
+            catalogKeyInput.value = catalog.key || "";
+            catalogValueInput.value = catalog.value || "";
+            catalogTypeInput.disabled = true; // Don't allow changing type on edit
+            modal.classList.remove("hidden");
+        }
+    };
+
+    // Delete function - called from DataTable actions
+    (window as any).deleteCatalog = async (id: number) => {
+        if (confirm("Are you sure you want to delete this catalog entry?")) {
+            const { data, error } = await actions.deleteCatalog({
+                id: id,
+            });
+            if (data?.success) {
+                navigate("/catalogs");
+            } else {
+                alert(error?.message || "Failed to delete catalog entry");
+            }
+        }
+    };
+
+    // Cancel button
+    document.getElementById("cancelBtn")?.addEventListener("click", () => {
+        if (modal) {
+            modal.classList.add("hidden");
+        }
+    });
+
+    // Form submit
+    form?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const id = catalogIdInput.value;
+        const type = catalogTypeInput.value;
+        const key = catalogKeyInput.value;
+        const value = catalogValueInput.value;
+
+        let result;
+        if (id) {
+            // Update
+            result = await actions.updateCatalog({
+                id: Number(id),
+                key,
+                value,
+            });
+        } else {
+            // Create
+            result = await actions.createCatalog({
+                type: Number(type),
+                key,
+                value,
+            });
+        }
+
+        if (result.data?.success) {
+            navigate("/catalogs");
+        } else {
+            alert(result.error?.message || result.data?.message || "Failed to save catalog entry");
+        }
+    });
+
+    // Close modal on outside click
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) {
+            modal.classList.add("hidden");
+        }
+    });
+</script>

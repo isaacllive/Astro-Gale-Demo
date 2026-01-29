@@ -1,0 +1,831 @@
+---
+import type { ColumnDef, TableAction } from '../shared/table';
+
+interface Props {
+    title?: string;
+    description?: string;
+    data: any[];
+    columns: ColumnDef[];
+    totalCount: number;
+    currentPage: number;
+    pageSize: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    searchQuery?: string;
+    baseUrl: string;
+    actions?: TableAction[];
+    showSearch?: boolean;
+    showExport?: boolean;
+    showColumnToggle?: boolean;
+}
+
+const {
+    title,
+    description,
+    data = [],
+    columns = [],
+    totalCount = 0,
+    currentPage = 1,
+    pageSize = 10,
+    sortBy,
+    sortOrder = 'asc',
+    searchQuery = '',
+    baseUrl,
+    actions = [],
+    showSearch = true,
+    showExport = true,
+    showColumnToggle = true,
+} = Astro.props;
+
+const totalPages = Math.ceil(totalCount / pageSize);
+const startRecord = (currentPage - 1) * pageSize + 1;
+const endRecord = Math.min(currentPage * pageSize, totalCount);
+
+// Build URL with query params
+const buildUrl = (params: Record<string, any>) => {
+    const url = new URL(baseUrl, 'http://localhost');
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    return url.search;
+};
+
+// Generate pagination page numbers with URLs
+interface PaginationLink {
+    pageNum: number;
+    url: string;
+    isActive: boolean;
+}
+
+const paginationLinks: PaginationLink[] = [];
+const maxPages = Math.min(5, totalPages);
+for (let i = 0; i < maxPages; i++) {
+    let pageNum: number;
+    if (totalPages <= 5) {
+        pageNum = i + 1;
+    } else if (currentPage <= 3) {
+        pageNum = i + 1;
+    } else if (currentPage >= totalPages - 2) {
+        pageNum = totalPages - 4 + i;
+    } else {
+        pageNum = currentPage - 2 + i;
+    }
+    paginationLinks.push({
+        pageNum,
+        url: `${baseUrl}${buildUrl({
+            page: pageNum,
+            sortBy,
+            sortOrder,
+            search: searchQuery,
+            pageSize,
+        })}`,
+        isActive: currentPage === pageNum,
+    });
+}
+---
+
+<div class="data-table-container">
+    <!-- Header -->
+    <div class="table-header">
+        <div>
+            {title && <h2 class="table-title">{title}</h2>}
+            {description && <p class="table-description">{description}</p>}
+        </div>
+        <div class="table-actions">
+            {showExport && (
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    onclick="exportTable()"
+                >
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export
+                </button>
+            )}
+            {actions.length > 0 && (
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    onclick="handleBulkAction()"
+                >
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Actions
+                </button>
+            )}
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="table-toolbar">
+        {showSearch && (
+            <div class="search-container">
+                <form method="GET" action={baseUrl} class="search-form">
+                    <input
+                        type="hidden"
+                        name="page"
+                        value="1"
+                    />
+                    <input
+                        type="hidden"
+                        name="sortBy"
+                        value={sortBy || ''}
+                    />
+                    <input
+                        type="hidden"
+                        name="sortOrder"
+                        value={sortOrder}
+                    />
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="search"
+                            name="search"
+                            value={searchQuery}
+                            placeholder="Search..."
+                            class="search-input"
+                        />
+                        {searchQuery && (
+                            <a
+                                href={baseUrl}
+                                class="search-clear"
+                                title="Clear search"
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </a>
+                        )}
+                    </div>
+                </form>
+            </div>
+        )}
+
+        <div class="table-controls">
+            <label class="control-label">
+                Page size:
+                <select
+                    name="pageSize"
+                    class="page-size-select"
+                    onchange="this.form.submit()"
+                >
+                    <option value="10" selected={pageSize === 10}>10</option>
+                    <option value="25" selected={pageSize === 25}>25</option>
+                    <option value="50" selected={pageSize === 50}>50</option>
+                    <option value="100" selected={pageSize === 100}>100</option>
+                </select>
+            </label>
+
+            {showColumnToggle && (
+                <button
+                    type="button"
+                    class="btn btn-icon"
+                    onclick="toggleColumnMenu()"
+                    title="Toggle columns"
+                >
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            )}
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-column">
+                        <input
+                            type="checkbox"
+                            class="select-all"
+                            onchange="toggleSelectAll(this)"
+                        />
+                    </th>
+                    {columns.map((column) => (
+                        <th
+                            class={column.className || ''}
+                            style={column.width ? `width: ${column.width}` : ''}
+                        >
+                            <div class="th-content">
+                                <span>{column.label}</span>
+                                {column.sortable && (
+                                    <a
+                                        href={`${baseUrl}${buildUrl({
+                                            page: 1,
+                                            sortBy: column.key,
+                                            sortOrder: sortBy === column.key && sortOrder === 'asc' ? 'desc' : 'asc',
+                                            search: searchQuery,
+                                            pageSize,
+                                        })}`}
+                                        class={`sort-icon ${sortBy === column.key ? `sort-${sortOrder}` : ''}`}
+                                        title={`Sort by ${column.label}`}
+                                    >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                        </svg>
+                                    </a>
+                                )}
+                            </div>
+                        </th>
+                    ))}
+                    {actions.length > 0 && (
+                        <th class="actions-column">Actions</th>
+                    )}
+                </tr>
+            </thead>
+            <tbody>
+                {data.length === 0 ? (
+                    <tr>
+                        <td colspan={columns.length + (actions.length > 0 ? 2 : 1)} class="empty-state">
+                            <div class="empty-content">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                </svg>
+                                <p>No data found</p>
+                            </div>
+                        </td>
+                    </tr>
+                ) : (
+                    data.map((row) => (
+                        <tr data-id={row.id}>
+                            <td class="checkbox-column">
+                                <input
+                                    type="checkbox"
+                                    class="row-checkbox"
+                                    value={row.id}
+                                />
+                            </td>
+                            {columns.map((column) => {
+                                const cellValue = column.render
+                                    ? column.render(row[column.key], row)
+                                    : String(row[column.key] || '');
+                                const isHtml = typeof cellValue === 'string' && (cellValue.includes('<') && cellValue.includes('>'));
+                                
+                                if (isHtml) {
+                                    return (
+                                        <td class={column.className || ''} set:html={cellValue} />
+                                    );
+                                }
+                                
+                                return (
+                                    <td class={column.className || ''}>
+                                        {cellValue}
+                                    </td>
+                                );
+                            })}
+                            {actions.length > 0 && (
+                                <td class="actions-column">
+                                    <div class="action-buttons">
+                                        {actions.map((action) => (
+                                            <button
+                                                type="button"
+                                                class={`btn btn-sm btn-${action.variant || 'secondary'}`}
+                                                onclick={action.onClick ? `${action.onClick}(${row.id})` : `handleAction('${action.action}', ${row.id})`}
+                                                title={action.label}
+                                            >
+                                                {action.icon || action.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </td>
+                            )}
+                        </tr>
+                    ))
+                )}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {totalPages > 1 && (
+        <div class="table-pagination">
+            <div class="pagination-info">
+                Showing {startRecord} to {endRecord} of {totalCount} entries
+            </div>
+            <div class="pagination-controls">
+                <a
+                    href={`${baseUrl}${buildUrl({
+                        page: currentPage - 1,
+                        sortBy,
+                        sortOrder,
+                        search: searchQuery,
+                        pageSize,
+                    })}`}
+                    class={`pagination-btn ${currentPage === 1 ? 'disabled' : ''}`}
+                    aria-label="Previous page"
+                >
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </a>
+
+                {paginationLinks.map((link) => (
+                    <a
+                        href={link.url}
+                        class={`pagination-btn ${link.isActive ? 'active' : ''}`}
+                    >
+                        {link.pageNum}
+                    </a>
+                ))}
+
+                <a
+                    href={`${baseUrl}${buildUrl({
+                        page: currentPage + 1,
+                        sortBy,
+                        sortOrder,
+                        search: searchQuery,
+                        pageSize,
+                    })}`}
+                    class={`pagination-btn ${currentPage === totalPages ? 'disabled' : ''}`}
+                    aria-label="Next page"
+                >
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    )}
+</div>
+
+<style>
+    .data-table-container {
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    }
+
+    .table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 1.5rem;
+        border-bottom: 1px solid rgb(229 231 235);
+    }
+
+    .table-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: rgb(17 24 39);
+    }
+
+    .table-description {
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        color: rgb(107 114 128);
+    }
+
+    .table-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid rgb(229 231 235);
+        background-color: rgb(249 250 251);
+    }
+
+    .search-container {
+        flex: 1 1 0%;
+        max-width: 28rem;
+    }
+
+    .search-form {
+        position: relative;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 1.25rem;
+        height: 1.25rem;
+        color: rgb(156 163 175);
+    }
+
+    .search-input {
+        width: 100%;
+        padding-left: 2.5rem;
+        padding-right: 2.5rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        border: 1px solid rgb(209 213 219);
+        border-radius: 0.375rem;
+    }
+
+    .search-input:focus {
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+        ring-width: 2px;
+        ring-color: rgb(99 102 241);
+        border-color: rgb(99 102 241);
+    }
+
+    .search-clear {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 1.25rem;
+        height: 1.25rem;
+        color: rgb(156 163 175);
+    }
+
+    .search-clear:hover {
+        color: rgb(75 85 99);
+    }
+
+    .table-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .control-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: rgb(55 65 81);
+    }
+
+    .page-size-select {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+        border: 1px solid rgb(209 213 219);
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
+    }
+
+    .data-table {
+        min-width: 100%;
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    @media (max-width: 1024px) {
+        .data-table th,
+        .data-table td {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .data-table {
+            font-size: 0.75rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .table-header {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: stretch;
+            padding: 1rem;
+        }
+
+        .table-title {
+            font-size: 1.25rem;
+        }
+
+        .table-toolbar {
+            flex-direction: column;
+            gap: 1rem;
+            padding: 0.75rem;
+        }
+
+        .search-container {
+            max-width: 100%;
+            width: 100%;
+        }
+
+        .table-controls {
+            flex-wrap: wrap;
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .table-pagination {
+            flex-direction: column;
+            gap: 1rem;
+            padding: 0.75rem;
+        }
+
+        .pagination-controls {
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .pagination-info {
+            text-align: center;
+            width: 100%;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .table-actions {
+            width: 100%;
+            flex-direction: column;
+        }
+
+        .table-actions .btn {
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .data-table-container {
+            border-radius: 0;
+            margin: -1rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            font-size: 0.7rem;
+            padding: 0.375rem;
+        }
+
+        .checkbox-column,
+        .actions-column {
+            width: auto;
+            min-width: 2.5rem;
+        }
+
+        .th-content {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+        }
+
+        .sort-icon {
+            margin-top: 0.25rem;
+        }
+    }
+
+    .data-table thead {
+        background-color: rgb(249 250 251);
+    }
+
+    .data-table th {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: rgb(107 114 128);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .th-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sort-icon {
+        color: rgb(156 163 175);
+    }
+
+    .sort-icon:hover {
+        color: rgb(75 85 99);
+    }
+
+    .sort-icon.sort-asc svg {
+        color: rgb(99 102 241);
+    }
+
+    .sort-icon.sort-desc svg {
+        color: rgb(99 102 241);
+        transform: rotate(180deg);
+    }
+
+    .data-table td {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        white-space: nowrap;
+        font-size: 0.875rem;
+        color: rgb(17 24 39);
+    }
+
+    @media (max-width: 640px) {
+        .data-table td {
+            white-space: normal;
+            word-break: break-word;
+        }
+    }
+
+    .checkbox-column {
+        width: 3rem;
+    }
+
+    .actions-column {
+        width: 8rem;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+    }
+
+    .empty-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: rgb(107 114 128);
+    }
+
+    .empty-icon {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    .table-pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-top: 1px solid rgb(229 231 235);
+    }
+
+    .pagination-info {
+        font-size: 0.875rem;
+        color: rgb(55 65 81);
+    }
+
+    .pagination-controls {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .pagination-btn {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: rgb(55 65 81);
+        background-color: white;
+        border: 1px solid rgb(209 213 219);
+        border-radius: 0.375rem;
+    }
+
+    .pagination-btn:hover:not(.disabled) {
+        background-color: rgb(249 250 251);
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .pagination-btn.active {
+        background-color: rgb(99 102 241);
+        color: white;
+        border-color: rgb(99 102 241);
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.375rem;
+        transition-property: color, background-color, border-color;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
+    }
+
+    .btn-primary {
+        background-color: rgb(99 102 241);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: rgb(79 70 229);
+    }
+
+    .btn-secondary {
+        background-color: rgb(229 231 235);
+        color: rgb(31 41 55);
+    }
+
+    .btn-secondary:hover {
+        background-color: rgb(209 213 219);
+    }
+
+    .btn-danger {
+        background-color: rgb(220 38 38);
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: rgb(185 28 28);
+    }
+
+    .btn-sm {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+        font-size: 0.75rem;
+    }
+
+    .btn-icon {
+        padding: 0.5rem;
+    }
+
+    .icon {
+        width: 1rem;
+        height: 1rem;
+    }
+</style>
+
+<script>
+    function toggleSelectAll(checkbox: HTMLInputElement) {
+        const checkboxes = document.querySelectorAll<HTMLInputElement>('.row-checkbox');
+        checkboxes.forEach((cb) => {
+            cb.checked = checkbox.checked;
+        });
+    }
+
+    function exportTable() {
+        // TODO: Implement export functionality
+        console.log('Export table');
+    }
+
+    function handleBulkAction() {
+        const selected = Array.from(
+            document.querySelectorAll<HTMLInputElement>('.row-checkbox:checked')
+        ).map((cb) => cb.value);
+        console.log('Bulk action on:', selected);
+    }
+
+    function handleAction(action: string, id: number) {
+        console.log('Action:', action, 'on ID:', id);
+    }
+
+    function toggleColumnMenu() {
+        // TODO: Implement column toggle menu
+        console.log('Toggle columns');
+    }
+</script>

@@ -1,30 +1,33 @@
-import { db, User, Person, Catalog, Assignment, Permision, File, FileContent, NOW, eq } from 'astro:db';
-import { getAllCatalogEntries } from '../src/shared/constants';
+import { db, User, Person, Catalog, Assignment, Permision, File, FileContent, PermissionDef, PermissionAssigned, NOW, eq, and } from 'astro:db';
+import { CATALOG_CONSTANTS, STATUSES, ASSIGNMENT_TYPES, OBJECT_TYPES, FILE_TYPES, STORAGE_LOCATIONS, PERMISSION_SUBJECT_TYPES, PERMISSION_EFFECTS, PERMISSION_RESOURCE_TYPES } from '../src/shared/constants';
+import { hash } from 'bcryptjs';
 
 // https://astro.build/db/seed
 export default async function seed() {
 
 	const sharedColumns = {
-		status: 'new',
+		status: STATUSES.ACTIVE.value,
 		createdAt: NOW,
 		createdBy: 1,
 		updatedAt: NOW,
 		updatedBy: 1,
-		metadata: {}
 	};
+
+	// Hash default password for all seed users
+	const defaultPassword = await hash('password', 10);
 
 	// Insert Users
 	await db.insert(User).values([
-		{ id: 1, username: 'Admin', password: 'default', ...sharedColumns },
-		{ id: 2, username: "Isaac", password: 'default', ...sharedColumns },
-		{ id: 3, username: "Peter", password: 'default', ...sharedColumns },
-		{ id: 4, username: "Kasim", password: 'default', ...sharedColumns },
-		{ id: 5, username: "Alice", password: 'default', ...sharedColumns },
-		{ id: 6, username: "Bob", password: 'default', ...sharedColumns },
-		{ id: 7, username: "Charlie", password: 'default', ...sharedColumns },
-		{ id: 8, username: "Diana", password: 'default', ...sharedColumns },
-		{ id: 9, username: "Eve", password: 'default', ...sharedColumns },
-		{ id: 10, username: "Frank", password: 'default', ...sharedColumns },
+		{ id: 1, username: 'admin', password: defaultPassword, ...sharedColumns },
+		{ id: 2, username: "Isaac", password: defaultPassword, ...sharedColumns },
+		{ id: 3, username: "Peter", password: defaultPassword, ...sharedColumns },
+		{ id: 4, username: "Kasim", password: defaultPassword, ...sharedColumns },
+		{ id: 5, username: "Alice", password: defaultPassword, ...sharedColumns },
+		{ id: 6, username: "Bob", password: defaultPassword, ...sharedColumns },
+		{ id: 7, username: "Charlie", password: defaultPassword, ...sharedColumns },
+		{ id: 8, username: "Diana", password: defaultPassword, ...sharedColumns },
+		{ id: 9, username: "Eve", password: defaultPassword, ...sharedColumns },
+		{ id: 10, username: "Frank", password: defaultPassword, ...sharedColumns },
 	]);
 
 	// Insert Persons
@@ -42,63 +45,81 @@ export default async function seed() {
 	]);
 
 	// Seed Catalog Constants
-	// IMPORTANT: Only the constants defined in src/shared/constants.ts are seeded.
-	// All catalog values should be defined there, and this function ensures they are
-	// always present in the database (inserting if missing, updating if they exist).
-	const catalogEntries = getAllCatalogEntries();
-
-	for (const entry of catalogEntries) {
-		// Check if catalog entry already exists by code
-		const existing = await db.select().from(Catalog).where(eq(Catalog.code, entry.code));
+	for (const entry of CATALOG_CONSTANTS) {
+		const existing = await db.select().from(Catalog)
+			.where(and(eq(Catalog.type, entry.type), eq(Catalog.key, entry.key)));
 
 		if (existing.length === 0) {
-			// Insert if it doesn't exist
 			await db.insert(Catalog).values({
-				code: entry.code,
+				type: entry.type,
 				key: entry.key,
 				value: entry.value,
 				...sharedColumns,
-				metadata: entry.category ? { category: entry.category } : {}
 			});
 		} else {
-			// Update if it exists to ensure values match constants
 			await db.update(Catalog)
 				.set({
-					key: entry.key,
 					value: entry.value,
 					updatedAt: NOW,
 					updatedBy: 1,
-					metadata: entry.category ? { category: entry.category } : {}
 				})
-				.where(eq(Catalog.code, entry.code));
+				.where(and(eq(Catalog.type, entry.type), eq(Catalog.key, entry.key)));
 		}
 	}
 
 	// Insert Assignments
 	await db.insert(Assignment).values([
-		{ type: "Task", objectCode: "OBJ1", recordId: 1, childObjectCode: "CHILD1", childRecordId: 2, startDate: null, endDate: null, isPrimary: true, ...sharedColumns },
-		{ type: "Task", objectCode: "OBJ2", recordId: 2, childObjectCode: "CHILD2", childRecordId: 3, startDate: null, endDate: null, isPrimary: false, ...sharedColumns },
+		{ type: ASSIGNMENT_TYPES.TASK.value, objectType: OBJECT_TYPES.USER.key, recordId: 1, childObjectType: OBJECT_TYPES.PERSON.key, childRecordId: 2, startDate: null, endDate: null, isPrimary: true, ...sharedColumns },
+		{ type: ASSIGNMENT_TYPES.TASK.value, objectType: OBJECT_TYPES.PERSON.key, recordId: 2, childObjectType: OBJECT_TYPES.ASSIGNMENT.key, childRecordId: 3, startDate: null, endDate: null, isPrimary: false, ...sharedColumns },
 		// Add 8 more rows...
 	]);
 
 	// Insert Permissions
 	await db.insert(Permision).values([
-		{ id: 1, userId: 1, objectCode: "OBJ1", recordId: 1, recordStatus: "active", canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExecute: true, ...sharedColumns },
-		{ id: 2, userId: 2, objectCode: "OBJ2", recordId: 2, recordStatus: "inactive", canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExecute: false, ...sharedColumns },
+		{ id: 1, userId: 1, objectType: OBJECT_TYPES.USER.key, recordId: 1, recordStatus: STATUSES.ACTIVE.value, canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExecute: true, ...sharedColumns },
+		{ id: 2, userId: 2, objectType: OBJECT_TYPES.PERSON.key, recordId: 2, recordStatus: STATUSES.INACTIVE.value, canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExecute: false, ...sharedColumns },
 		// Add 8 more rows...
 	]);
 
 	// Insert Files
 	await db.insert(File).values([
-		{ id: 1, name: "File1", description: true, fileType: "txt", mimeType: "text/plain", ...sharedColumns },
-		{ id: 2, name: "File2", description: false, fileType: "jpg", mimeType: "image/jpeg", ...sharedColumns },
+		{ id: 1, name: "File1", description: true, fileType: FILE_TYPES.DOCUMENT.value, mimeType: "text/plain", ...sharedColumns },
+		{ id: 2, name: "File2", description: false, fileType: FILE_TYPES.IMAGE.value, mimeType: "image/jpeg", ...sharedColumns },
 		// Add 8 more rows...
 	]);
 
 	// Insert FileContents
 	await db.insert(FileContent).values([
-		{ id: 1, FileId: 1, description: true, filePath: "/tmp/files/file1.txt", storageLocation: "local", storageProvider: "provider1", checksum: "abc123", isPrimary: true, ...sharedColumns },
-		{ id: 2, FileId: 2, description: false, filePath: "/tmp/files/file2.jpg", storageLocation: "cloud", storageProvider: "provider2", checksum: "def456", isPrimary: false, ...sharedColumns },
+		{ id: 1, FileId: 1, description: true, filePath: "/tmp/files/file1.txt", storageLocation: STORAGE_LOCATIONS.LOCAL.value, storageProvider: "provider1", checksum: "abc123", isPrimary: true, ...sharedColumns },
+		{ id: 2, FileId: 2, description: false, filePath: "/tmp/files/file2.jpg", storageLocation: STORAGE_LOCATIONS.CLOUD.value, storageProvider: "provider2", checksum: "def456", isPrimary: false, ...sharedColumns },
 		// Add 8 more rows...
+	]);
+
+	// Insert Permission Definitions
+	await db.insert(PermissionDef).values([
+		{ id: 1, objectType: "USERS", resourceType: PERMISSION_RESOURCE_TYPES.ACTION, resourceName: "getusers", description: "Get list of users", isActive: true, ...sharedColumns },
+		{ id: 2, objectType: "USERS", resourceType: PERMISSION_RESOURCE_TYPES.ACTION, resourceName: "createuser", description: "Create a new user", isActive: true, ...sharedColumns },
+		{ id: 3, objectType: "USERS", resourceType: PERMISSION_RESOURCE_TYPES.ACTION, resourceName: "updateuser", description: "Update an existing user", isActive: true, ...sharedColumns },
+		{ id: 4, objectType: "USERS", resourceType: PERMISSION_RESOURCE_TYPES.ACTION, resourceName: "deleteuser", description: "Delete a user", isActive: true, ...sharedColumns },
+		{ id: 5, objectType: "USERS", resourceType: PERMISSION_RESOURCE_TYPES.SCREEN, resourceName: "view", description: "View users screen", isActive: true, ...sharedColumns },
+		{ id: 6, objectType: "REPORTS", resourceType: PERMISSION_RESOURCE_TYPES.ACTION, resourceName: "generatereport", description: "Generate reports", isActive: true, ...sharedColumns },
+		{ id: 7, objectType: "REPORTS", resourceType: PERMISSION_RESOURCE_TYPES.SCREEN, resourceName: "view", description: "View reports screen", isActive: true, ...sharedColumns },
+		{ id: 8, objectType: "SOLICITUDES", resourceType: PERMISSION_RESOURCE_TYPES.ACTION, resourceName: "createsolicitud", description: "Create a solicitud", isActive: true, ...sharedColumns },
+		{ id: 9, objectType: "SOLICITUDES", resourceType: PERMISSION_RESOURCE_TYPES.API, resourceName: "getall", description: "Get all solicitudes via API", isActive: true, ...sharedColumns },
+		{ id: 10, objectType: "USERS", resourceType: PERMISSION_RESOURCE_TYPES.JOB, resourceName: "cleanup", description: "Run user cleanup job", isActive: true, ...sharedColumns },
+	]);
+
+	// Insert Permission Assignments
+	await db.insert(PermissionAssigned).values([
+		{ id: 1, permissionDefId: 1, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 1, effect: PERMISSION_EFFECTS.ALLOW, priority: 100, ...sharedColumns },
+		{ id: 2, permissionDefId: 2, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 1, effect: PERMISSION_EFFECTS.ALLOW, priority: 100, ...sharedColumns },
+		{ id: 3, permissionDefId: 3, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 1, effect: PERMISSION_EFFECTS.ALLOW, priority: 100, ...sharedColumns },
+		{ id: 4, permissionDefId: 4, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 1, effect: PERMISSION_EFFECTS.ALLOW, priority: 100, ...sharedColumns },
+		{ id: 5, permissionDefId: 5, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 1, effect: PERMISSION_EFFECTS.ALLOW, priority: 100, ...sharedColumns },
+		{ id: 6, permissionDefId: 1, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 2, effect: PERMISSION_EFFECTS.ALLOW, priority: 50, ...sharedColumns },
+		{ id: 7, permissionDefId: 5, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 2, effect: PERMISSION_EFFECTS.ALLOW, priority: 50, ...sharedColumns },
+		{ id: 8, permissionDefId: 4, subjectType: PERMISSION_SUBJECT_TYPES.USER, subjectId: 2, effect: PERMISSION_EFFECTS.DENY, priority: 200, ...sharedColumns },
+		{ id: 9, permissionDefId: 6, subjectType: PERMISSION_SUBJECT_TYPES.ROLE, subjectId: null, effect: PERMISSION_EFFECTS.ALLOW, priority: 75, ...sharedColumns },
+		{ id: 10, permissionDefId: 7, subjectType: PERMISSION_SUBJECT_TYPES.ROLE, subjectId: null, effect: PERMISSION_EFFECTS.ALLOW, priority: 75, ...sharedColumns },
 	]);
 }

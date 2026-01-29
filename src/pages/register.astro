@@ -1,0 +1,713 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Logo from "../components/Logo.astro";
+import { actions, isInputError } from "astro:actions";
+
+const { cookies } = Astro;
+
+// Check if user is already logged in
+const userId = cookies.get("user-id");
+
+if (userId) {
+    return Astro.redirect("/dashboard");
+}
+
+// Get any error message from the URL
+const error = Astro.url.searchParams.get("error");
+
+const resp = Astro.getActionResult(actions.register);
+const inputErrors = isInputError(resp?.error) ? resp.error.fields : {};
+
+if (resp?.error) {
+    console.log(resp.error);
+}
+
+if (resp?.data?.success) {
+    return Astro.redirect(resp.data.redirect);
+}
+---
+
+<Layout title="Register">
+    <div
+        class="min-h-screen flex items-center justify-center bg-gray-50 relative"
+    >
+        <!-- Background Image with Overlay -->
+        <div class="absolute inset-0 z-0">
+            <img
+                src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2069&q=80"
+                alt="Background"
+                class="w-full h-full object-cover"
+            />
+            <div class="absolute inset-0 bg-gray-900 opacity-50"></div>
+        </div>
+
+        <!-- Registration Card -->
+        <div
+            class="max-w-md w-full space-y-8 bg-white rounded-lg shadow-xl p-8 relative z-10 transform transition-all duration-300 hover:scale-105"
+        >
+            <div class="flex flex-col items-center">
+                <div class="text-indigo-600">
+                    <Logo />
+                </div>
+                <h2
+                    class="mt-6 text-center text-3xl font-extrabold text-gray-900"
+                >
+                    Create your account
+                </h2>
+                <p class="mt-2 text-center text-sm text-gray-600">
+                    Or
+                    <a
+                        href="/login"
+                        class="font-medium text-indigo-600 hover:text-indigo-500"
+                    >
+                        sign in to your account
+                    </a>
+                </p>
+            </div>
+            <form
+                id="registerForm"
+                class="mt-8 space-y-6"
+                method="POST"
+                action={actions.register}
+            >
+                <!-- Error Message -->
+                <div id="errorMessage" class="hidden rounded-md bg-red-50 p-4 border border-red-200">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg
+                                class="h-5 w-5 text-red-400"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path
+                                    fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p
+                                id="errorText"
+                                class="text-sm font-medium text-red-800"
+                            >
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Username Field -->
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">
+                            Username
+                        </label>
+                        <input
+                            id="username"
+                            name="username"
+                            type="text"
+                            required
+                            minlength="3"
+                            maxlength="30"
+                            pattern="[a-zA-Z0-9_]+"
+                            class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+                            placeholder="Choose a username"
+                        />
+                        <p id="usernameError" class="mt-1 text-sm text-red-600 hidden"></p>
+                        {
+                            inputErrors.username && (
+                                <p class="mt-1 text-sm text-red-600">
+                                    {inputErrors.username.join(", ")}
+                                </p>
+                            )
+                        }
+                    </div>
+
+                    <!-- Email Field -->
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                            Email
+                        </label>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            required
+                            class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+                            placeholder="your.email@example.com"
+                        />
+                        <p id="emailError" class="mt-1 text-sm text-red-600 hidden"></p>
+                        {
+                            inputErrors.email && (
+                                <p class="mt-1 text-sm text-red-600">
+                                    {inputErrors.email.join(", ")}
+                                </p>
+                            )
+                        }
+                    </div>
+
+                    <!-- Password Field -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+                            Password
+                        </label>
+                        <div class="relative">
+                            <input
+                                id="password"
+                                name="password"
+                                type="password"
+                                required
+                                minlength="8"
+                                class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+                                placeholder="Create a strong password"
+                            />
+                            <button
+                                type="button"
+                                id="togglePassword"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                            >
+                                <svg id="eyeIcon" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Password Strength Indicator -->
+                        <div id="passwordStrength" class="mt-2 hidden">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div id="strengthBar" class="h-full transition-all duration-300 rounded-full"></div>
+                                </div>
+                                <span id="strengthText" class="text-xs font-medium"></span>
+                            </div>
+                            <ul id="passwordRequirements" class="mt-2 text-xs text-gray-600 space-y-1">
+                                <li id="req-length" class="flex items-center">
+                                    <span class="mr-2">•</span>
+                                    <span>At least 8 characters</span>
+                                </li>
+                                <li id="req-uppercase" class="flex items-center">
+                                    <span class="mr-2">•</span>
+                                    <span>One uppercase letter</span>
+                                </li>
+                                <li id="req-lowercase" class="flex items-center">
+                                    <span class="mr-2">•</span>
+                                    <span>One lowercase letter</span>
+                                </li>
+                                <li id="req-number" class="flex items-center">
+                                    <span class="mr-2">•</span>
+                                    <span>One number</span>
+                                </li>
+                                <li id="req-special" class="flex items-center">
+                                    <span class="mr-2">•</span>
+                                    <span>One special character</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <p id="passwordError" class="mt-1 text-sm text-red-600 hidden"></p>
+                        {
+                            inputErrors.password && (
+                                <p class="mt-1 text-sm text-red-600">
+                                    {inputErrors.password.join(", ")}
+                                </p>
+                            )
+                        }
+                    </div>
+
+                    <!-- Confirm Password Field -->
+                    <div>
+                        <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">
+                            Confirm Password
+                        </label>
+                        <div class="relative">
+                            <input
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                type="password"
+                                required
+                                class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+                                placeholder="Confirm your password"
+                            />
+                            <button
+                                type="button"
+                                id="toggleConfirmPassword"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                            >
+                                <svg id="eyeIconConfirm" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <p id="confirmPasswordError" class="mt-1 text-sm text-red-600 hidden"></p>
+                        {
+                            inputErrors.confirmPassword && (
+                                <p class="mt-1 text-sm text-red-600">
+                                    {inputErrors.confirmPassword.join(", ")}
+                                </p>
+                            )
+                        }
+                    </div>
+
+                    <!-- Terms and Conditions -->
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input
+                                id="acceptTerms"
+                                name="acceptTerms"
+                                type="checkbox"
+                                required
+                                class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                            />
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="acceptTerms" class="font-medium text-gray-700">
+                                I agree to the{" "}
+                                <a href="/terms" class="text-indigo-600 hover:text-indigo-500">
+                                    Terms and Conditions
+                                </a>
+                                {" "}and{" "}
+                                <a href="/privacy" class="text-indigo-600 hover:text-indigo-500">
+                                    Privacy Policy
+                                </a>
+                            </label>
+                        </div>
+                    </div>
+                    {
+                        inputErrors.acceptTerms && (
+                            <p class="text-sm text-red-600">
+                                {inputErrors.acceptTerms.join(", ")}
+                            </p>
+                        )
+                    }
+                </div>
+
+                {
+                    error && (
+                        <div class="rounded-md bg-red-50 p-4 border border-red-200">
+                            <div class="flex">
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-red-800">
+                                        {error}
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                <div>
+                    <button
+                        type="submit"
+                        id="submitButton"
+                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <span
+                            id="submitIcon"
+                            class="absolute left-0 inset-y-0 flex items-center pl-3"
+                        >
+                            <svg
+                                class="h-5 w-5 text-indigo-500 group-hover:text-indigo-400"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    fill-rule="evenodd"
+                                    d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </span>
+                        <span id="submitText">Create Account</span>
+                        <span id="submitSpinner" class="hidden ml-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-white text-gray-500"
+                            >Or continue with</span
+                        >
+                    </div>
+                </div>
+
+                <div class="mt-6 grid grid-cols-2 gap-3">
+                    <div>
+                        <a
+                            href="#"
+                            class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors duration-200"
+                        >
+                            <span class="sr-only">Sign up with Google</span>
+                            <svg
+                                class="w-5 h-5"
+                                aria-hidden="true"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                                ></path>
+                            </svg>
+                        </a>
+                    </div>
+
+                    <div>
+                        <a
+                            href="#"
+                            class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors duration-200"
+                        >
+                            <span class="sr-only">Sign up with GitHub</span>
+                            <svg
+                                class="w-5 h-5"
+                                aria-hidden="true"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    fill-rule="evenodd"
+                                    d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import { navigate } from "astro:transitions/client";
+    import { actions, isInputError } from "astro:actions";
+
+    const form = document.getElementById("registerForm") as HTMLFormElement;
+    const errorMessage = document.getElementById("errorMessage");
+    const errorText = document.getElementById("errorText");
+    const submitButton = document.getElementById("submitButton") as HTMLButtonElement;
+    const submitText = document.getElementById("submitText");
+    const submitSpinner = document.getElementById("submitSpinner");
+    const submitIcon = document.getElementById("submitIcon");
+
+    // Form fields
+    const usernameInput = document.getElementById("username") as HTMLInputElement;
+    const emailInput = document.getElementById("email") as HTMLInputElement;
+    const passwordInput = document.getElementById("password") as HTMLInputElement;
+    const confirmPasswordInput = document.getElementById("confirmPassword") as HTMLInputElement;
+    const acceptTermsInput = document.getElementById("acceptTerms") as HTMLInputElement;
+
+    // Error displays
+    const usernameError = document.getElementById("usernameError");
+    const emailError = document.getElementById("emailError");
+    const passwordError = document.getElementById("passwordError");
+    const confirmPasswordError = document.getElementById("confirmPasswordError");
+
+    // Password strength elements
+    const passwordStrength = document.getElementById("passwordStrength");
+    const strengthBar = document.getElementById("strengthBar");
+    const strengthText = document.getElementById("strengthText");
+    const passwordRequirements = {
+        length: document.getElementById("req-length"),
+        uppercase: document.getElementById("req-uppercase"),
+        lowercase: document.getElementById("req-lowercase"),
+        number: document.getElementById("req-number"),
+        special: document.getElementById("req-special"),
+    };
+
+    // Toggle password visibility
+    const togglePassword = document.getElementById("togglePassword");
+    const toggleConfirmPassword = document.getElementById("toggleConfirmPassword");
+    const eyeIcon = document.getElementById("eyeIcon");
+    const eyeIconConfirm = document.getElementById("eyeIconConfirm");
+
+    togglePassword?.addEventListener("click", () => {
+        const type = passwordInput.type === "password" ? "text" : "password";
+        passwordInput.type = type;
+        if (eyeIcon) {
+            eyeIcon.innerHTML = type === "password"
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>';
+        }
+    });
+
+    toggleConfirmPassword?.addEventListener("click", () => {
+        const type = confirmPasswordInput.type === "password" ? "text" : "password";
+        confirmPasswordInput.type = type;
+        if (eyeIconConfirm) {
+            eyeIconConfirm.innerHTML = type === "password"
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>';
+        }
+    });
+
+    // Password strength checker
+    function checkPasswordStrength(password: string) {
+        const checks = {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            lowercase: /[a-z]/.test(password),
+            number: /[0-9]/.test(password),
+            special: /[^A-Za-z0-9]/.test(password),
+        };
+
+        const passedChecks = Object.values(checks).filter(Boolean).length;
+        const strength = passedChecks < 3 ? "weak" : passedChecks < 5 ? "medium" : "strong";
+
+        // Update requirement indicators
+        Object.entries(checks).forEach(([key, passed]) => {
+            const req = passwordRequirements[key as keyof typeof passwordRequirements];
+            if (req) {
+                const span = req.querySelector("span");
+                if (span) {
+                    span.textContent = passed ? "✓" : "•";
+                    span.className = passed ? "mr-2 text-green-600" : "mr-2";
+                }
+                req.classList.toggle("text-green-600", passed);
+                req.classList.toggle("text-gray-600", !passed);
+            }
+        });
+
+        // Update strength bar
+        if (strengthBar && strengthText) {
+            const percentage = (passedChecks / 5) * 100;
+            strengthBar.style.width = `${percentage}%`;
+            
+            if (strength === "weak") {
+                strengthBar.className = "h-full transition-all duration-300 rounded-full bg-red-500";
+                strengthText.textContent = "Weak";
+                strengthText.className = "text-xs font-medium text-red-600";
+            } else if (strength === "medium") {
+                strengthBar.className = "h-full transition-all duration-300 rounded-full bg-yellow-500";
+                strengthText.textContent = "Medium";
+                strengthText.className = "text-xs font-medium text-yellow-600";
+            } else {
+                strengthBar.className = "h-full transition-all duration-300 rounded-full bg-green-500";
+                strengthText.textContent = "Strong";
+                strengthText.className = "text-xs font-medium text-green-600";
+            }
+        }
+
+        return { checks, strength, passedChecks };
+    }
+
+    // Real-time validation
+    usernameInput?.addEventListener("input", () => {
+        const username = usernameInput.value;
+        if (usernameError) {
+            if (username.length > 0 && username.length < 3) {
+                usernameError.textContent = "Username must be at least 3 characters";
+                usernameError.classList.remove("hidden");
+                usernameInput.classList.add("border-red-500");
+            } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                usernameError.textContent = "Username can only contain letters, numbers, and underscores";
+                usernameError.classList.remove("hidden");
+                usernameInput.classList.add("border-red-500");
+            } else {
+                usernameError.classList.add("hidden");
+                usernameInput.classList.remove("border-red-500");
+            }
+        }
+    });
+
+    emailInput?.addEventListener("input", () => {
+        const email = emailInput.value;
+        if (emailError) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (email.length > 0 && !emailRegex.test(email)) {
+                emailError.textContent = "Please enter a valid email address";
+                emailError.classList.remove("hidden");
+                emailInput.classList.add("border-red-500");
+            } else {
+                emailError.classList.add("hidden");
+                emailInput.classList.remove("border-red-500");
+            }
+        }
+    });
+
+    passwordInput?.addEventListener("input", () => {
+        const password = passwordInput.value;
+        if (passwordStrength) {
+            if (password.length > 0) {
+                passwordStrength.classList.remove("hidden");
+                checkPasswordStrength(password);
+            } else {
+                passwordStrength.classList.add("hidden");
+            }
+        }
+        if (passwordError) {
+            passwordError.classList.add("hidden");
+            passwordInput.classList.remove("border-red-500");
+        }
+        // Check password match
+        if (confirmPasswordInput.value.length > 0) {
+            validatePasswordMatch();
+        }
+    });
+
+    function validatePasswordMatch() {
+        if (confirmPasswordError) {
+            if (confirmPasswordInput.value !== passwordInput.value) {
+                confirmPasswordError.textContent = "Passwords don't match";
+                confirmPasswordError.classList.remove("hidden");
+                confirmPasswordInput.classList.add("border-red-500");
+            } else {
+                confirmPasswordError.classList.add("hidden");
+                confirmPasswordInput.classList.remove("border-red-500");
+            }
+        }
+    }
+
+    confirmPasswordInput?.addEventListener("input", validatePasswordMatch);
+
+    // Form submission
+    form?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Hide error message
+        if (errorMessage) {
+            errorMessage.classList.add("hidden");
+        }
+
+        // Clear field errors
+        [usernameError, emailError, passwordError, confirmPasswordError].forEach(el => {
+            if (el) el.classList.add("hidden");
+        });
+
+        // Validate form
+        let isValid = true;
+
+        // Validate username
+        if (!usernameInput.value || usernameInput.value.length < 3) {
+            if (usernameError) {
+                usernameError.textContent = "Username must be at least 3 characters";
+                usernameError.classList.remove("hidden");
+            }
+            usernameInput.classList.add("border-red-500");
+            isValid = false;
+        }
+
+        // Validate email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailInput.value)) {
+            if (emailError) {
+                emailError.textContent = "Please enter a valid email address";
+                emailError.classList.remove("hidden");
+            }
+            emailInput.classList.add("border-red-500");
+            isValid = false;
+        }
+
+        // Validate password
+        const passwordStrengthResult = checkPasswordStrength(passwordInput.value);
+        if (passwordStrengthResult.passedChecks < 5) {
+            if (passwordError) {
+                passwordError.textContent = "Password does not meet all requirements";
+                passwordError.classList.remove("hidden");
+            }
+            passwordInput.classList.add("border-red-500");
+            isValid = false;
+        }
+
+        // Validate password match
+        if (passwordInput.value !== confirmPasswordInput.value) {
+            if (confirmPasswordError) {
+                confirmPasswordError.textContent = "Passwords don't match";
+                confirmPasswordError.classList.remove("hidden");
+            }
+            confirmPasswordInput.classList.add("border-red-500");
+            isValid = false;
+        }
+
+        // Validate terms
+        if (!acceptTermsInput.checked) {
+            isValid = false;
+        }
+
+        if (!isValid) {
+            return;
+        }
+
+        // Disable submit button and show loading state
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        if (submitText) {
+            submitText.textContent = "Creating Account...";
+        }
+        if (submitSpinner) {
+            submitSpinner.classList.remove("hidden");
+        }
+        if (submitIcon) {
+            submitIcon.classList.add("hidden");
+        }
+
+        const formData = new FormData(form);
+        formData.set("acceptTerms", acceptTermsInput.checked ? "true" : "false");
+
+        try {
+            const { data, error } = await actions.register(formData);
+
+            if (error) {
+                // Handle input errors
+                const inputErr = isInputError(error) ? error : null;
+                if (inputErr && 'fields' in inputErr) {
+                    Object.entries(inputErr.fields).forEach(([field, messages]) => {
+                        const fieldInput = form.querySelector(`[name="${field}"]`) as HTMLInputElement;
+                        const fieldError = document.getElementById(`${field}Error`);
+                        if (fieldInput) {
+                            fieldInput.classList.add("border-red-500");
+                        }
+                        if (fieldError && Array.isArray(messages)) {
+                            fieldError.textContent = messages.join(", ");
+                            fieldError.classList.remove("hidden");
+                        }
+                    });
+                } else {
+                    // Show general error
+                    if (errorMessage && errorText) {
+                        errorText.textContent = error.message || "An error occurred during registration";
+                        errorMessage.classList.remove("hidden");
+                    }
+                }
+            } else if (data?.success) {
+                navigate(data.redirect || "/dashboard");
+            } else {
+                // Show error message
+                const errorMsg = data?.error || "An error occurred during registration";
+                if (errorMessage && errorText) {
+                    errorText.textContent = errorMsg;
+                    errorMessage.classList.remove("hidden");
+                }
+            }
+        } catch (err) {
+            console.error("Registration error:", err);
+            if (errorMessage && errorText) {
+                errorText.textContent = "An unexpected error occurred. Please try again.";
+                errorMessage.classList.remove("hidden");
+            }
+        } finally {
+            // Re-enable submit button
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+            if (submitText) {
+                submitText.textContent = "Create Account";
+            }
+            if (submitSpinner) {
+                submitSpinner.classList.add("hidden");
+            }
+            if (submitIcon) {
+                submitIcon.classList.remove("hidden");
+            }
+        }
+    });
+</script>

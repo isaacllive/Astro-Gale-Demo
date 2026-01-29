@@ -1,0 +1,851 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { db, User, Person, File, Assignment, FileContent } from "astro:db";
+
+const { cookies } = Astro;
+
+// Check if user is logged in
+const userId = cookies.get("user-id");
+
+if (!userId) {
+    return Astro.redirect("/login?error=Please login to access the dashboard");
+}
+
+// Fetch metrics from database
+const [allUsers, allPersons, allFiles, allAssignments, allFileContents] =
+    await Promise.all([
+        db.select().from(User),
+        db.select().from(Person),
+        db.select().from(File),
+        db.select().from(Assignment),
+        db.select().from(FileContent),
+    ]);
+
+// Calculate user metrics
+const userCount = allUsers.length;
+const activeUserCount = allUsers.filter((u) => u.status === "Active").length;
+const sevenDaysAgo = new Date();
+sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+const recentLoginCount = allUsers.filter(
+    (u) => u.lastLogin && new Date(u.lastLogin) >= sevenDaysAgo,
+).length;
+
+// Calculate person metrics
+const personCount = allPersons.length;
+const personsByGenderMap = new Map<string, number>();
+allPersons.forEach((p) => {
+    const gender = p.gender || "Unknown";
+    personsByGenderMap.set(gender, (personsByGenderMap.get(gender) || 0) + 1);
+});
+const personsByGender = Array.from(personsByGenderMap.entries()).map(
+    ([gender, count]) => ({ gender, count }),
+);
+
+// Calculate file metrics
+const fileCount = allFiles.length;
+const filesByTypeMap = new Map<string, number>();
+allFiles.forEach((f) => {
+    const fileType = f.fileType || "Unknown";
+    filesByTypeMap.set(fileType, (filesByTypeMap.get(fileType) || 0) + 1);
+});
+const filesByType = Array.from(filesByTypeMap.entries()).map(
+    ([fileType, count]) => ({ fileType, count }),
+);
+
+// Calculate assignment metrics
+const assignmentCount = allAssignments.length;
+const assignmentsByTypeMap = new Map<string, number>();
+allAssignments.forEach((a) => {
+    const type = a.type || "Unknown";
+    assignmentsByTypeMap.set(type, (assignmentsByTypeMap.get(type) || 0) + 1);
+});
+const assignmentsByType = Array.from(assignmentsByTypeMap.entries()).map(
+    ([type, count]) => ({ type, count }),
+);
+
+// Calculate file content metrics
+const fileContentCount = allFileContents.length;
+const fileContentsByLocationMap = new Map<string, number>();
+allFileContents.forEach((fc) => {
+    const location = fc.storageLocation || "Unknown";
+    fileContentsByLocationMap.set(
+        location,
+        (fileContentsByLocationMap.get(location) || 0) + 1,
+    );
+});
+const fileContentsByLocation = Array.from(
+    fileContentsByLocationMap.entries(),
+).map(([storageLocation, count]) => ({ storageLocation, count }));
+
+// Calculate percentages
+const activeUserPercentage =
+    userCount > 0 ? Math.round((activeUserCount / userCount) * 100) : 0;
+const recentLoginPercentage =
+    userCount > 0 ? Math.round((recentLoginCount / userCount) * 100) : 0;
+
+// Dummy metrics for system health
+const systemHealth = 98;
+const uptime = "99.9%";
+const responseTime = "45ms";
+const errorRate = "0.02%";
+---
+
+<Layout title="Dashboard">
+    <div class="min-h-screen bg-gray-100">
+        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="px-4 py-6 sm:px-0">
+                <!-- Page Header -->
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+                    <p class="mt-2 text-sm text-gray-600">
+                        Overview of your system metrics and statistics
+                    </p>
+                </div>
+
+                <!-- User Metrics Section -->
+                <div class="mb-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                        User Metrics
+                    </h2>
+                    <div
+                        class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
+                    >
+                        <!-- Total Users -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-indigo-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Total Users
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {userCount}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Users -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Active Users
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {activeUserCount}
+                                                <span
+                                                    class="text-sm text-gray-500"
+                                                    >({
+                                                        activeUserPercentage
+                                                    }%)</span
+                                                >
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Logins -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Recent Logins (7d)
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {recentLoginCount}
+                                                <span
+                                                    class="text-sm text-gray-500"
+                                                    >({
+                                                        recentLoginPercentage
+                                                    }%)</span
+                                                >
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Inactive Users -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-gray-400 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Inactive Users
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {userCount - activeUserCount}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Metrics Section -->
+                <div class="mb-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                        System Metrics
+                    </h2>
+                    <div
+                        class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
+                    >
+                        <!-- System Health -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                System Health
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {systemHealth}%
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Uptime -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Uptime
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {uptime}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Response Time -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Avg Response Time
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {responseTime}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error Rate -->
+                        <div
+                            class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+                        >
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Error Rate
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {errorRate}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Overview Section -->
+                <div class="mb-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                        Data Overview
+                    </h2>
+                    <div
+                        class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
+                    >
+                        <!-- Total Persons -->
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-teal-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Total Persons
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {personCount}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Files -->
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Total Files
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {fileCount}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Assignments -->
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-pink-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                Total Assignments
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {assignmentCount}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- File Contents -->
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div
+                                            class="w-8 h-8 bg-cyan-500 rounded-md flex items-center justify-center"
+                                        >
+                                            <svg
+                                                class="w-5 h-5 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                                                ></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt
+                                                class="text-sm font-medium text-gray-500 truncate"
+                                            >
+                                                File Contents
+                                            </dt>
+                                            <dd
+                                                class="text-lg font-semibold text-gray-900"
+                                            >
+                                                {fileContentCount}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Statistics Section -->
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <!-- Persons by Gender -->
+                    <div class="bg-white shadow rounded-lg">
+                        <div class="px-6 py-5 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">
+                                Persons by Gender
+                            </h3>
+                        </div>
+                        <div class="px-6 py-5">
+                            <div class="space-y-4">
+                                {
+                                    personsByGender.map((item) => {
+                                        const percentage =
+                                            personCount > 0
+                                                ? Math.round(
+                                                      (item.count /
+                                                          personCount) *
+                                                          100,
+                                                  )
+                                                : 0;
+                                        return (
+                                            <div>
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="text-gray-600">
+                                                        {item.gender ||
+                                                            "Unknown"}
+                                                    </span>
+                                                    <span class="text-gray-900 font-medium">
+                                                        {item.count} (
+                                                        {percentage}%)
+                                                    </span>
+                                                </div>
+                                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                                    <div
+                                                        class="bg-indigo-600 h-2 rounded-full"
+                                                        style={`width: ${percentage}%`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Files by Type -->
+                    <div class="bg-white shadow rounded-lg">
+                        <div class="px-6 py-5 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">
+                                Files by Type
+                            </h3>
+                        </div>
+                        <div class="px-6 py-5">
+                            {
+                                filesByType.length > 0 ? (
+                                    <div class="space-y-4">
+                                        {filesByType.map((item) => {
+                                            const percentage =
+                                                fileCount > 0
+                                                    ? Math.round(
+                                                          (item.count /
+                                                              fileCount) *
+                                                              100,
+                                                      )
+                                                    : 0;
+                                            return (
+                                                <div>
+                                                    <div class="flex justify-between text-sm mb-1">
+                                                        <span class="text-gray-600">
+                                                            {item.fileType ||
+                                                                "Unknown"}
+                                                        </span>
+                                                        <span class="text-gray-900 font-medium">
+                                                            {item.count} (
+                                                            {percentage}%)
+                                                        </span>
+                                                    </div>
+                                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                                        <div
+                                                            class="bg-orange-500 h-2 rounded-full"
+                                                            style={`width: ${percentage}%`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p class="text-sm text-gray-500">
+                                        No data available
+                                    </p>
+                                )
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Assignments by Type -->
+                    <div class="bg-white shadow rounded-lg">
+                        <div class="px-6 py-5 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">
+                                Assignments by Type
+                            </h3>
+                        </div>
+                        <div class="px-6 py-5">
+                            <div class="space-y-4">
+                                {
+                                    assignmentsByType.map((item) => {
+                                        const percentage =
+                                            assignmentCount > 0
+                                                ? Math.round(
+                                                      (item.count /
+                                                          assignmentCount) *
+                                                          100,
+                                                  )
+                                                : 0;
+                                        return (
+                                            <div>
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="text-gray-600">
+                                                        {item.type || "Unknown"}
+                                                    </span>
+                                                    <span class="text-gray-900 font-medium">
+                                                        {item.count} (
+                                                        {percentage}%)
+                                                    </span>
+                                                </div>
+                                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                                    <div
+                                                        class="bg-pink-500 h-2 rounded-full"
+                                                        style={`width: ${percentage}%`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Contents by Storage Location -->
+                    <div class="bg-white shadow rounded-lg">
+                        <div class="px-6 py-5 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">
+                                Storage Locations
+                            </h3>
+                        </div>
+                        <div class="px-6 py-5">
+                            {
+                                fileContentsByLocation.length > 0 ? (
+                                    <div class="space-y-4">
+                                        {fileContentsByLocation.map((item) => {
+                                            const percentage =
+                                                fileContentCount > 0
+                                                    ? Math.round(
+                                                          (item.count /
+                                                              fileContentCount) *
+                                                              100,
+                                                      )
+                                                    : 0;
+                                            return (
+                                                <div>
+                                                    <div class="flex justify-between text-sm mb-1">
+                                                        <span class="text-gray-600">
+                                                            {item.storageLocation ||
+                                                                "Unknown"}
+                                                        </span>
+                                                        <span class="text-gray-900 font-medium">
+                                                            {item.count} (
+                                                            {percentage}%)
+                                                        </span>
+                                                    </div>
+                                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                                        <div
+                                                            class="bg-cyan-500 h-2 rounded-full"
+                                                            style={`width: ${percentage}%`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p class="text-sm text-gray-500">
+                                        No data available
+                                    </p>
+                                )
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</Layout>
