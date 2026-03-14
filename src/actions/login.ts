@@ -4,7 +4,6 @@ import { compare } from 'bcryptjs';
 import { z } from 'zod';
 
 export const login = defineAction({
-    accept: 'form',
     input: z.object({
         username: z.string(),
         password: z.string(),
@@ -45,6 +44,14 @@ export const login = defineAction({
                 maxAge: 60 * 60 * 24 * 7, // 1 week
                 secure: process.env.NODE_ENV === 'production', // Only secure in production
                 httpOnly: true,
+                sameSite: 'strict',
+            });
+
+            // Set theme cookie for dark mode preference
+            const theme = (user as { darkMode?: boolean }).darkMode ? 'dark' : 'light';
+            cookies.set('theme', theme, {
+                path: '/',
+                maxAge: 60 * 60 * 24 * 365,
                 sameSite: 'strict',
             });
 

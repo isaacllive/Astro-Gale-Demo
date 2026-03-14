@@ -17,6 +17,12 @@ interface Props {
     showSearch?: boolean;
     showExport?: boolean;
     showColumnToggle?: boolean;
+    /** Link for "Add new record" (e.g. /persons/new). Shown in table Actions dropdown. */
+    addNewHref?: string;
+    /** Label for add-new (default: "Add new record"). */
+    addNewLabel?: string;
+    /** Global function name to call for add (e.g. open modal). Used when add is not a link. */
+    addNewOnClick?: string;
 }
 
 const {
@@ -35,7 +41,12 @@ const {
     showSearch = true,
     showExport = true,
     showColumnToggle = true,
+    addNewHref,
+    addNewLabel = 'Add new record',
+    addNewOnClick,
 } = Astro.props;
+
+const hasAddNew = Boolean(addNewHref || addNewOnClick);
 
 const totalPages = Math.ceil(totalCount / pageSize);
 const startRecord = (currentPage - 1) * pageSize + 1;
@@ -86,94 +97,113 @@ for (let i = 0; i < maxPages; i++) {
 }
 ---
 
-<div class="data-table-container">
+<div class="card data-table-container">
     <!-- Header -->
-    <div class="table-header">
+    <div class="flex flex-wrap justify-between items-start gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <div>
-            {title && <h2 class="table-title">{title}</h2>}
-            {description && <p class="table-description">{description}</p>}
+            {title && <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">{title}</h2>}
+            {description && <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>}
         </div>
-        <div class="table-actions">
-            {showExport && (
+        {(showExport || actions.length > 0 || hasAddNew) && (
+        <div class="flex gap-2">
+            <div class="relative" data-table-actions-wrap>
                 <button
                     type="button"
-                    class="btn btn-secondary"
-                    onclick="exportTable()"
+                    class="btn-primary btn-sm inline-flex items-center gap-1.5"
+                    onclick="toggleTableActionsMenu(event)"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    id="table-actions-trigger"
                 >
-                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export
-                </button>
-            )}
-            {actions.length > 0 && (
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    onclick="handleBulkAction()"
-                >
-                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     Actions
+                    <svg class="h-4 w-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
                 </button>
-            )}
+                <div id="table-actions-menu" class="actions-dropdown hidden" role="menu">
+                    {hasAddNew && (
+                        addNewHref ? (
+                            <a href={addNewHref} class="actions-dropdown-item" role="menuitem" onclick="closeTableActionsMenu();">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                {addNewLabel}
+                            </a>
+                        ) : (
+                            <button type="button" class="actions-dropdown-item" role="menuitem" onclick={`typeof window.${addNewOnClick} === 'function' && window.${addNewOnClick}(); closeTableActionsMenu();`}>
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                {addNewLabel}
+                            </button>
+                        )
+                    )}
+                    {showExport && (
+                        <button type="button" class="actions-dropdown-item" role="menuitem" onclick="exportTable(); closeTableActionsMenu();">
+                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Export
+                        </button>
+                    )}
+                    {actions.length > 0 && (
+                        <button type="button" class="actions-dropdown-item" role="menuitem" onclick="handleBulkAction(); closeTableActionsMenu();">
+                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                            Bulk actions
+                        </button>
+                    )}
+                </div>
+            </div>
         </div>
+        )}
     </div>
 
     <!-- Toolbar -->
-    <div class="table-toolbar">
+    <div class="flex flex-wrap justify-between items-center gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
         {showSearch && (
-            <div class="search-container">
-                <form method="GET" action={baseUrl} class="search-form">
-                    <input
-                        type="hidden"
-                        name="page"
-                        value="1"
-                    />
-                    <input
-                        type="hidden"
-                        name="sortBy"
-                        value={sortBy || ''}
-                    />
-                    <input
-                        type="hidden"
-                        name="sortOrder"
-                        value={sortOrder}
-                    />
-                    <div class="search-input-wrapper">
-                        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex-1 min-w-0 max-w-md">
+                <form method="GET" action={baseUrl} class="relative">
+                    <input type="hidden" name="page" value="1" />
+                    <input type="hidden" name="sortBy" value={sortBy || ''} />
+                    <input type="hidden" name="sortOrder" value={sortOrder} />
+                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
-                        <input
-                            type="search"
-                            name="search"
-                            value={searchQuery}
-                            placeholder="Search..."
-                            class="search-input"
-                        />
-                        {searchQuery && (
-                            <a
-                                href={baseUrl}
-                                class="search-clear"
-                                title="Clear search"
-                            >
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </a>
-                        )}
-                    </div>
+                    </span>
+                    <input
+                        type="search"
+                        name="search"
+                        value={searchQuery}
+                        placeholder="Search..."
+                        class="form-input w-full pl-10 pr-10 py-2"
+                    />
+                    {searchQuery && (
+                        <a href={baseUrl} class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Clear search">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </a>
+                    )}
                 </form>
             </div>
         )}
 
-        <div class="table-controls">
-            <label class="control-label">
+        <form method="GET" action={baseUrl} class="flex items-center gap-4">
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="sortBy" value={sortBy || ''} />
+            <input type="hidden" name="sortOrder" value={sortOrder} />
+            <input type="hidden" name="search" value={searchQuery || ''} />
+            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 Page size:
                 <select
                     name="pageSize"
-                    class="page-size-select"
+                    class="form-select py-1.5 px-2 w-auto text-sm"
                     onchange="this.form.submit()"
                 >
                     <option value="10" selected={pageSize === 10}>10</option>
@@ -182,40 +212,28 @@ for (let i = 0; i < maxPages; i++) {
                     <option value="100" selected={pageSize === 100}>100</option>
                 </select>
             </label>
-
-            {showColumnToggle && (
-                <button
-                    type="button"
-                    class="btn btn-icon"
-                    onclick="toggleColumnMenu()"
-                    title="Toggle columns"
-                >
-                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                </button>
-            )}
+        </form>
+        {showColumnToggle && (
+            <button type="button" class="btn-secondary btn-icon" onclick="toggleColumnMenu()" title="Toggle columns">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        )}
         </div>
     </div>
 
     <!-- Table -->
-    <div class="table-wrapper">
-        <table class="data-table">
+    <div class="overflow-x-auto">
+        <table class="data-table w-full min-w-full border-collapse">
             <thead>
-                <tr>
-                    <th class="checkbox-column">
-                        <input
-                            type="checkbox"
-                            class="select-all"
-                            onchange="toggleSelectAll(this)"
-                        />
+                <tr class="bg-gray-50 dark:bg-gray-800/50">
+                    <th class="data-table-th w-12 px-4 sm:px-6 py-3">
+                        <input type="checkbox" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" onchange="toggleSelectAll(this)" />
                     </th>
                     {columns.map((column) => (
-                        <th
-                            class={column.className || ''}
-                            style={column.width ? `width: ${column.width}` : ''}
-                        >
-                            <div class="th-content">
+                        <th class={`data-table-th px-4 sm:px-6 py-3 ${column.className || ''}`} style={column.width ? `width: ${column.width}` : ''}>
+                            <div class="flex items-center gap-2">
                                 <span>{column.label}</span>
                                 {column.sortable && (
                                     <a
@@ -226,10 +244,10 @@ for (let i = 0; i < maxPages; i++) {
                                             search: searchQuery,
                                             pageSize,
                                         })}`}
-                                        class={`sort-icon ${sortBy === column.key ? `sort-${sortOrder}` : ''}`}
+                                        class={`shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ${sortBy === column.key ? 'text-primary-600 dark:text-primary-400' : ''}`}
                                         title={`Sort by ${column.label}`}
                                     >
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class={`h-4 w-4 ${sortBy === column.key && sortOrder === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                                         </svg>
                                     </a>
@@ -237,64 +255,64 @@ for (let i = 0; i < maxPages; i++) {
                             </div>
                         </th>
                     ))}
-                    {actions.length > 0 && (
-                        <th class="actions-column">Actions</th>
-                    )}
+                    {actions.length > 0 && <th class="data-table-th px-4 sm:px-6 py-3 w-24">Actions</th>}
                 </tr>
             </thead>
             <tbody>
                 {data.length === 0 ? (
                     <tr>
-                        <td colspan={columns.length + (actions.length > 0 ? 2 : 1)} class="empty-state">
-                            <div class="empty-content">
-                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <td colspan={columns.length + (actions.length > 0 ? 2 : 1)} class="px-4 sm:px-6 py-12 text-center">
+                            <div class="empty-state-container">
+                                <svg class="empty-state-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                 </svg>
-                                <p>No data found</p>
+                                <p class="empty-state-title">No data found</p>
                             </div>
                         </td>
                     </tr>
                 ) : (
                     data.map((row) => (
-                        <tr data-id={row.id}>
-                            <td class="checkbox-column">
-                                <input
-                                    type="checkbox"
-                                    class="row-checkbox"
-                                    value={row.id}
-                                />
+                        <tr data-id={row.id} class="data-table-tr border-b border-gray-200 dark:border-gray-700 last:border-0">
+                            <td class="px-4 sm:px-6 py-3 w-12">
+                                <input type="checkbox" class="row-checkbox rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" value={row.id} />
                             </td>
                             {columns.map((column) => {
                                 const cellValue = column.render
                                     ? column.render(row[column.key], row)
                                     : String(row[column.key] || '');
                                 const isHtml = typeof cellValue === 'string' && (cellValue.includes('<') && cellValue.includes('>'));
-                                
-                                if (isHtml) {
-                                    return (
-                                        <td class={column.className || ''} set:html={cellValue} />
-                                    );
-                                }
-                                
-                                return (
-                                    <td class={column.className || ''}>
-                                        {cellValue}
-                                    </td>
-                                );
+                                if (isHtml) return <td class={`data-table-td ${column.className || ''}`} set:html={cellValue} />;
+                                return <td class={`data-table-td ${column.className || ''}`}>{cellValue}</td>;
                             })}
                             {actions.length > 0 && (
-                                <td class="actions-column">
-                                    <div class="action-buttons">
-                                        {actions.map((action) => (
-                                            <button
-                                                type="button"
-                                                class={`btn btn-sm btn-${action.variant || 'secondary'}`}
-                                                onclick={action.onClick ? `${action.onClick}(${row.id})` : `handleAction('${action.action}', ${row.id})`}
-                                                title={action.label}
-                                            >
-                                                {action.icon || action.label}
-                                            </button>
-                                        ))}
+                                <td class="px-4 sm:px-6 py-3 w-24">
+                                    <div class="relative" data-row-actions-wrap>
+                                        <button
+                                            type="button"
+                                            class="btn-secondary btn-sm inline-flex items-center gap-1"
+                                            onclick={`toggleRowActionsMenu(event, ${row.id})`}
+                                            aria-haspopup="true"
+                                            aria-expanded="false"
+                                            title="Actions"
+                                        >
+                                            Actions
+                                            <svg class="h-3.5 w-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                        <div class="actions-dropdown row-actions-menu hidden" role="menu" data-row-id={row.id}>
+                                            {actions.map((action) => (
+                                                <button
+                                                    type="button"
+                                                    class={`actions-dropdown-item ${action.variant === 'danger' ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' : ''}`}
+                                                    role="menuitem"
+                                                    onclick={action.onClick ? `${action.onClick}(${row.id}); closeRowActionsMenu(${row.id});` : `handleAction('${action.action}', ${row.id}); closeRowActionsMenu(${row.id});`}
+                                                >
+                                                    {action.icon && <span class="shrink-0">{action.icon}</span>}
+                                                    {action.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </td>
                             )}
@@ -307,48 +325,31 @@ for (let i = 0; i < maxPages; i++) {
 
     <!-- Pagination -->
     {totalPages > 1 && (
-        <div class="table-pagination">
-            <div class="pagination-info">
+        <div class="flex flex-wrap justify-between items-center gap-4 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
                 Showing {startRecord} to {endRecord} of {totalCount} entries
-            </div>
-            <div class="pagination-controls">
+            </p>
+            <div class="flex gap-1">
                 <a
-                    href={`${baseUrl}${buildUrl({
-                        page: currentPage - 1,
-                        sortBy,
-                        sortOrder,
-                        search: searchQuery,
-                        pageSize,
-                    })}`}
-                    class={`pagination-btn ${currentPage === 1 ? 'disabled' : ''}`}
+                    href={currentPage === 1 ? '#' : `${baseUrl}${buildUrl({ page: currentPage - 1, sortBy, sortOrder, search: searchQuery, pageSize })}`}
+                    class={`pagination-btn ${currentPage === 1 ? 'opacity-50 pointer-events-none' : ''}`}
                     aria-label="Previous page"
                 >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </a>
-
                 {paginationLinks.map((link) => (
-                    <a
-                        href={link.url}
-                        class={`pagination-btn ${link.isActive ? 'active' : ''}`}
-                    >
+                    <a href={link.url} class={`pagination-btn ${link.isActive ? 'pagination-btn-active' : ''}`}>
                         {link.pageNum}
                     </a>
                 ))}
-
                 <a
-                    href={`${baseUrl}${buildUrl({
-                        page: currentPage + 1,
-                        sortBy,
-                        sortOrder,
-                        search: searchQuery,
-                        pageSize,
-                    })}`}
-                    class={`pagination-btn ${currentPage === totalPages ? 'disabled' : ''}`}
+                    href={currentPage === totalPages ? '#' : `${baseUrl}${buildUrl({ page: currentPage + 1, sortBy, sortOrder, search: searchQuery, pageSize })}`}
+                    class={`pagination-btn ${currentPage === totalPages ? 'opacity-50 pointer-events-none' : ''}`}
                     aria-label="Next page"
                 >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                 </a>
@@ -358,445 +359,69 @@ for (let i = 0; i < maxPages; i++) {
 </div>
 
 <style>
-    .data-table-container {
-        background-color: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    }
-
-    .table-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        padding: 1.5rem;
-        border-bottom: 1px solid rgb(229 231 235);
-    }
-
-    .table-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: rgb(17 24 39);
-    }
-
-    .table-description {
+    .actions-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
         margin-top: 0.25rem;
-        font-size: 0.875rem;
-        color: rgb(107 114 128);
-    }
-
-    .table-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .table-toolbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-        border-bottom: 1px solid rgb(229 231 235);
-        background-color: rgb(249 250 251);
-    }
-
-    .search-container {
-        flex: 1 1 0%;
-        max-width: 28rem;
-    }
-
-    .search-form {
-        position: relative;
-    }
-
-    .search-input-wrapper {
-        position: relative;
-    }
-
-    .search-icon {
-        position: absolute;
-        left: 0.75rem;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 1.25rem;
-        height: 1.25rem;
-        color: rgb(156 163 175);
-    }
-
-    .search-input {
-        width: 100%;
-        padding-left: 2.5rem;
-        padding-right: 2.5rem;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
-        border: 1px solid rgb(209 213 219);
+        min-width: 10rem;
+        padding: 0.25rem 0;
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--color-border, #e5e7eb);
         border-radius: 0.375rem;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        z-index: 50;
     }
-
-    .search-input:focus {
-        outline: 2px solid transparent;
-        outline-offset: 2px;
-        ring-width: 2px;
-        ring-color: rgb(99 102 241);
-        border-color: rgb(99 102 241);
+    .dark .actions-dropdown {
+        background: var(--color-bg-dark);
+        border-color: var(--color-border-dark, #374151);
     }
-
-    .search-clear {
-        position: absolute;
-        right: 0.75rem;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 1.25rem;
-        height: 1.25rem;
-        color: rgb(156 163 175);
+    .actions-dropdown.hidden {
+        display: none;
     }
-
-    .search-clear:hover {
-        color: rgb(75 85 99);
+    .actions-dropdown:not(.hidden) {
+        display: block;
     }
-
-    .table-controls {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .control-label {
+    .actions-dropdown-item {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.875rem;
-        color: rgb(55 65 81);
-    }
-
-    .page-size-select {
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
-        padding-top: 0.25rem;
-        padding-bottom: 0.25rem;
-        border: 1px solid rgb(209 213 219);
-        border-radius: 0.375rem;
-        font-size: 0.875rem;
-    }
-
-    .table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        position: relative;
-    }
-
-    .data-table {
-        min-width: 100%;
-        border-collapse: collapse;
         width: 100%;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        font-size: 0.875rem;
+        color: var(--color-text, #374151);
+        background: transparent;
+        border: none;
+        cursor: pointer;
     }
-
-    @media (max-width: 1024px) {
-        .data-table th,
-        .data-table td {
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
-        }
+    .actions-dropdown-item:hover {
+        background: var(--color-hover, #f3f4f6);
     }
-
+    .dark .actions-dropdown-item {
+        color: var(--color-text-dark, #e5e7eb);
+    }
+    .dark .actions-dropdown-item:hover {
+        background: var(--color-hover-dark, #374151);
+    }
+    .row-actions-menu {
+        left: 0;
+        right: auto;
+    }
+    /* Responsive: smaller table and full-width toolbar on small screens */
     @media (max-width: 768px) {
-        .data-table {
-            font-size: 0.75rem;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding-left: 0.5rem;
-            padding-right: 0.5rem;
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
-        }
-
-        .table-header {
-            flex-direction: column;
-            gap: 1rem;
-            align-items: stretch;
-            padding: 1rem;
-        }
-
-        .table-title {
-            font-size: 1.25rem;
-        }
-
-        .table-toolbar {
-            flex-direction: column;
-            gap: 1rem;
-            padding: 0.75rem;
-        }
-
-        .search-container {
-            max-width: 100%;
-            width: 100%;
-        }
-
-        .table-controls {
-            flex-wrap: wrap;
-            width: 100%;
-            justify-content: space-between;
-        }
-
-        .table-pagination {
-            flex-direction: column;
-            gap: 1rem;
-            padding: 0.75rem;
-        }
-
-        .pagination-controls {
-            flex-wrap: wrap;
-            justify-content: center;
-            width: 100%;
-        }
-
-        .pagination-info {
-            text-align: center;
-            width: 100%;
-        }
-
-        .action-buttons {
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .btn {
-            width: 100%;
-            justify-content: center;
-        }
-
-        .table-actions {
-            width: 100%;
-            flex-direction: column;
-        }
-
-        .table-actions .btn {
-            width: 100%;
+        .data-table-container .data-table-td {
+            white-space: normal;
+            word-break: break-word;
         }
     }
 
     @media (max-width: 640px) {
         .data-table-container {
             border-radius: 0;
-            margin: -1rem;
+            margin-left: -1rem;
+            margin-right: -1rem;
         }
-
-        .data-table th,
-        .data-table td {
-            font-size: 0.7rem;
-            padding: 0.375rem;
-        }
-
-        .checkbox-column,
-        .actions-column {
-            width: auto;
-            min-width: 2.5rem;
-        }
-
-        .th-content {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.25rem;
-        }
-
-        .sort-icon {
-            margin-top: 0.25rem;
-        }
-    }
-
-    .data-table thead {
-        background-color: rgb(249 250 251);
-    }
-
-    .data-table th {
-        padding-left: 1.5rem;
-        padding-right: 1.5rem;
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
-        text-align: left;
-        font-size: 0.75rem;
-        font-weight: 500;
-        color: rgb(107 114 128);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    .th-content {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .sort-icon {
-        color: rgb(156 163 175);
-    }
-
-    .sort-icon:hover {
-        color: rgb(75 85 99);
-    }
-
-    .sort-icon.sort-asc svg {
-        color: rgb(99 102 241);
-    }
-
-    .sort-icon.sort-desc svg {
-        color: rgb(99 102 241);
-        transform: rotate(180deg);
-    }
-
-    .data-table td {
-        padding-left: 1.5rem;
-        padding-right: 1.5rem;
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        white-space: nowrap;
-        font-size: 0.875rem;
-        color: rgb(17 24 39);
-    }
-
-    @media (max-width: 640px) {
-        .data-table td {
-            white-space: normal;
-            word-break: break-word;
-        }
-    }
-
-    .checkbox-column {
-        width: 3rem;
-    }
-
-    .actions-column {
-        width: 8rem;
-    }
-
-    .action-buttons {
-        display: flex;
-        gap: 0.25rem;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding-top: 3rem;
-        padding-bottom: 3rem;
-    }
-
-    .empty-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.5rem;
-        color: rgb(107 114 128);
-    }
-
-    .empty-icon {
-        width: 3rem;
-        height: 3rem;
-    }
-
-    .table-pagination {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-        border-top: 1px solid rgb(229 231 235);
-    }
-
-    .pagination-info {
-        font-size: 0.875rem;
-        color: rgb(55 65 81);
-    }
-
-    .pagination-controls {
-        display: flex;
-        gap: 0.25rem;
-    }
-
-    .pagination-btn {
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: rgb(55 65 81);
-        background-color: white;
-        border: 1px solid rgb(209 213 219);
-        border-radius: 0.375rem;
-    }
-
-    .pagination-btn:hover:not(.disabled) {
-        background-color: rgb(249 250 251);
-    }
-
-    .pagination-btn.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .pagination-btn.active {
-        background-color: rgb(99 102 241);
-        color: white;
-        border-color: rgb(99 102 241);
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        border-radius: 0.375rem;
-        transition-property: color, background-color, border-color;
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        transition-duration: 150ms;
-    }
-
-    .btn-primary {
-        background-color: rgb(99 102 241);
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background-color: rgb(79 70 229);
-    }
-
-    .btn-secondary {
-        background-color: rgb(229 231 235);
-        color: rgb(31 41 55);
-    }
-
-    .btn-secondary:hover {
-        background-color: rgb(209 213 219);
-    }
-
-    .btn-danger {
-        background-color: rgb(220 38 38);
-        color: white;
-    }
-
-    .btn-danger:hover {
-        background-color: rgb(185 28 28);
-    }
-
-    .btn-sm {
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
-        padding-top: 0.25rem;
-        padding-bottom: 0.25rem;
-        font-size: 0.75rem;
-    }
-
-    .btn-icon {
-        padding: 0.5rem;
-    }
-
-    .icon {
-        width: 1rem;
-        height: 1rem;
     }
 </style>
 
@@ -823,6 +448,57 @@ for (let i = 0; i < maxPages; i++) {
     function handleAction(action: string, id: number) {
         console.log('Action:', action, 'on ID:', id);
     }
+
+    function toggleTableActionsMenu(ev: Event) {
+        ev.stopPropagation();
+        const menu = document.getElementById('table-actions-menu');
+        const trigger = document.getElementById('table-actions-trigger');
+        if (!menu || !trigger) return;
+        const isOpen = !menu.classList.contains('hidden');
+        closeAllActionsMenus();
+        if (!isOpen) {
+            menu.classList.remove('hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+        } else {
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function closeTableActionsMenu() {
+        const menu = document.getElementById('table-actions-menu');
+        const trigger = document.getElementById('table-actions-trigger');
+        if (menu) menu.classList.add('hidden');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleRowActionsMenu(ev: Event, rowId: number) {
+        ev.stopPropagation();
+        const wrap = (ev.target as HTMLElement).closest('[data-row-actions-wrap]');
+        const menu = wrap?.querySelector('.row-actions-menu');
+        if (!menu) return;
+        const isOpen = !menu.classList.contains('hidden');
+        closeAllActionsMenus();
+        if (!isOpen) {
+            menu.classList.remove('hidden');
+            (wrap?.querySelector('button[aria-haspopup]') as HTMLElement)?.setAttribute('aria-expanded', 'true');
+        } else {
+            (wrap?.querySelector('button[aria-haspopup]') as HTMLElement)?.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function closeRowActionsMenu(rowId: number) {
+        const menu = document.querySelector(`.row-actions-menu[data-row-id="${rowId}"]`);
+        const wrap = menu?.closest('[data-row-actions-wrap]');
+        if (menu) menu.classList.add('hidden');
+        (wrap?.querySelector('button[aria-haspopup]') as HTMLElement)?.setAttribute('aria-expanded', 'false');
+    }
+
+    function closeAllActionsMenus() {
+        document.querySelectorAll('.actions-dropdown').forEach((el) => el.classList.add('hidden'));
+        document.querySelectorAll('[data-table-actions-wrap] button[aria-haspopup], [data-row-actions-wrap] button[aria-haspopup]').forEach((el) => el.setAttribute('aria-expanded', 'false'));
+    }
+
+    document.addEventListener('click', () => closeAllActionsMenus());
 
     function toggleColumnMenu() {
         // TODO: Implement column toggle menu

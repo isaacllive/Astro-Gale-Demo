@@ -8,6 +8,8 @@ import { createAssignment, deleteAssignment, getAssignment, updateAssignment } f
 import { createPermission, deletePermission, getPermission, updatePermission } from './permissions';
 import { createPermissionDef, deletePermissionDef, getPermissionDef, updatePermissionDef } from './permission-defs';
 import { createPermissionAssigned, deletePermissionAssigned, getPermissionAssigned, updatePermissionAssigned } from './permission-assigned';
+import { createRole, deleteRole, getRole, updateRole } from './roles';
+import { createServiceRequest, deleteServiceRequest, getServiceRequest, updateServiceRequest } from './service-requests';
 import { getProfile, updateProfile, changePassword } from './profile';
 import { createNotification, getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification } from './notifications';
 
@@ -43,6 +45,14 @@ export const server = {
     createPermissionAssigned,
     updatePermissionAssigned,
     deletePermissionAssigned,
+    getRole,
+    updateRole,
+    deleteRole,
+    createRole,
+    getServiceRequest,
+    updateServiceRequest,
+    deleteServiceRequest,
+    createServiceRequest,
     getProfile,
     updateProfile,
     changePassword,

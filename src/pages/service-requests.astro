@@ -1,0 +1,544 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DataTable from "../components/DataTable.astro";
+import { db, ServiceRequest, Person } from "astro:db";
+import { parseTableQuery, buildTableResponse } from "../shared/table";
+import { eq, like, desc, asc, sql, or } from "astro:db";
+
+const { cookies, redirect, url } = Astro;
+
+// Check authentication
+const userId = cookies.get("user-id");
+if (!userId) {
+    return redirect("/login?error=Please login to access service requests");
+}
+
+// Parse query parameters
+const query = parseTableQuery(url);
+const { page = 1, pageSize = 10, sortBy, sortOrder = "asc", search } = query;
+const offset = (page - 1) * pageSize;
+
+// Build query
+let requestQuery = db.select().from(ServiceRequest);
+let countQuery = db
+    .select({ count: sql<number>`count(*)` })
+    .from(ServiceRequest);
+
+// Apply search
+if (search) {
+    const searchCondition = or(
+        like(ServiceRequest.title, `%${search}%`),
+        like(ServiceRequest.description, `%${search}%`),
+        like(ServiceRequest.type, `%${search}%`),
+    );
+    requestQuery = requestQuery.where(searchCondition);
+    countQuery = countQuery.where(searchCondition);
+}
+
+// Apply sorting
+if (sortBy) {
+    const orderFn = sortOrder === "desc" ? desc : asc;
+    if (sortBy === "title") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.title));
+    } else if (sortBy === "type") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.type));
+    } else if (sortBy === "priority") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.priority));
+    } else if (sortBy === "status") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.status));
+    } else if (sortBy === "dueDate") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.dueDate));
+    } else if (sortBy === "id") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.id));
+    } else if (sortBy === "createdAt") {
+        requestQuery = requestQuery.orderBy(orderFn(ServiceRequest.createdAt));
+    } else {
+        requestQuery = requestQuery.orderBy(desc(ServiceRequest.id));
+    }
+} else {
+    requestQuery = requestQuery.orderBy(desc(ServiceRequest.id));
+}
+
+// Apply pagination
+requestQuery = requestQuery.limit(pageSize).offset(offset);
+
+// Execute queries and fetch persons for display
+const [requests, countResult, persons] = await Promise.all([
+    requestQuery,
+    countQuery,
+    db
+        .select({
+            id: Person.id,
+            firstName: Person.firstName,
+            lastName: Person.lastName,
+        })
+        .from(Person),
+]);
+
+const personMap = new Map(
+    persons.map((p) => [p.id, `${p.firstName} ${p.lastName}`]),
+);
+const totalCount = countResult[0]?.count || 0;
+const response = buildTableResponse(requests, totalCount, query);
+
+// Define columns
+const columns = [
+    {
+        key: "id",
+        label: "ID",
+        sortable: true,
+        className: "font-mono text-xs",
+    },
+    {
+        key: "title",
+        label: "Title",
+        sortable: true,
+        filterable: true,
+    },
+    {
+        key: "type",
+        label: "Type",
+        sortable: true,
+        filterable: true,
+    },
+    {
+        key: "priority",
+        label: "Priority",
+        sortable: true,
+        render: (value: any) => {
+            if (!value) return "—";
+            const colors: Record<string, { bg: string; text: string }> = {
+                urgent: { bg: "rgb(254 226 226)", text: "rgb(185 28 28)" },
+                high: { bg: "rgb(254 243 199)", text: "rgb(161 98 7)" },
+                medium: { bg: "rgb(219 234 254)", text: "rgb(29 78 216)" },
+                low: { bg: "rgb(243 244 246)", text: "rgb(55 65 81)" },
+            };
+            const style = colors[value.toLowerCase()] || colors.low;
+            return `<span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 500; background-color: ${style.bg}; color: ${style.text};">${value}</span>`;
+        },
+    },
+    {
+        key: "requesterId",
+        label: "Requester",
+        sortable: true,
+        render: (value: any, row: any) => personMap.get(value) || `#${value}`,
+    },
+    {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        render: (value: any) => {
+            const statusColors: Record<string, { bg: string; text: string }> = {
+                pending: { bg: "rgb(254 243 199)", text: "rgb(161 98 7)" },
+                in_progress: { bg: "rgb(219 234 254)", text: "rgb(29 78 216)" },
+                completed: { bg: "rgb(220 252 231)", text: "rgb(22 101 52)" },
+                cancelled: { bg: "rgb(243 244 246)", text: "rgb(107 114 128)" },
+                active: { bg: "rgb(220 252 231)", text: "rgb(22 101 52)" },
+            };
+            const style =
+                statusColors[value?.toLowerCase()] || statusColors.pending;
+            return `<span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background-color: ${style.bg}; color: ${style.text};">${value || "N/A"}</span>`;
+        },
+    },
+    {
+        key: "dueDate",
+        label: "Due Date",
+        sortable: true,
+        render: (value: any) => {
+            if (!value) return "—";
+            return new Date(value).toLocaleDateString();
+        },
+    },
+    {
+        key: "createdAt",
+        label: "Created",
+        sortable: true,
+        render: (value: any) => {
+            if (!value) return "N/A";
+            return new Date(value).toLocaleDateString();
+        },
+    },
+];
+
+// Define actions
+const actions = [
+    {
+        label: "Edit",
+        action: "edit",
+        icon: "✏️",
+        variant: "secondary" as const,
+        onClick: "editServiceRequest",
+    },
+    {
+        label: "Cancel",
+        action: "delete",
+        icon: "🗑️",
+        variant: "danger" as const,
+        onClick: "cancelServiceRequest",
+    },
+];
+---
+
+<Layout title="Service Requests">
+    <DataTable
+                title="Service Requests"
+                description="Manage generic service requests and tickets"
+                data={response.data}
+                columns={columns}
+                totalCount={response.totalCount}
+                currentPage={response.currentPage}
+                pageSize={response.pageSize}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                searchQuery={search}
+                baseUrl="/service-requests"
+                actions={actions}
+                showSearch={true}
+                showExport={true}
+                showColumnToggle={true}
+                addNewOnClick="openCreateServiceRequestModal"
+                addNewLabel="New service request"
+            />
+    <!-- Edit / Create Service Request Modal -->
+    <div
+        id="serviceRequestModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+    >
+        <div
+            class="relative top-20 mx-auto p-5 border w-[28rem] shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
+        >
+            <div class="mt-3">
+                <h3
+                    class="text-lg font-medium text-gray-900 mb-4"
+                    id="serviceRequestModalTitle"
+                >
+                    Edit Service Request
+                </h3>
+                <form id="serviceRequestForm" class="space-y-4">
+                    <input type="hidden" id="serviceRequestId" />
+                    <div>
+                        <label
+                            for="serviceRequestTitle"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Title
+                        </label>
+                        <input
+                            type="text"
+                            id="serviceRequestTitle"
+                            name="title"
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                            placeholder="Request title"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            for="serviceRequestDescription"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Description
+                        </label>
+                        <textarea
+                            id="serviceRequestDescription"
+                            name="description"
+                            rows="3"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                            placeholder="Describe the request"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label
+                                for="serviceRequestType"
+                                class="block text-sm font-medium text-gray-700"
+                            >
+                                Type
+                            </label>
+                            <select
+                                id="serviceRequestType"
+                                name="type"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                            >
+                                <option value="">— Select —</option>
+                                <option value="support">Support</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="general">General</option>
+                                <option value="inquiry">Inquiry</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                for="serviceRequestPriority"
+                                class="block text-sm font-medium text-gray-700"
+                            >
+                                Priority
+                            </label>
+                            <select
+                                id="serviceRequestPriority"
+                                name="priority"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                            >
+                                <option value="">— Select —</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label
+                            for="serviceRequestRequester"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Requester
+                        </label>
+                        <select
+                            id="serviceRequestRequester"
+                            name="requesterId"
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        >
+                            <option value="">— Select person —</option>
+                            {
+                                persons.map((p) => (
+                                    <option value={p.id}>
+                                        {p.firstName} {p.lastName}
+                                    </option>
+                                ))
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            for="serviceRequestStatus"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Status
+                        </label>
+                        <select
+                            id="serviceRequestStatus"
+                            name="status"
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            for="serviceRequestDueDate"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            Due Date
+                        </label>
+                        <input
+                            type="date"
+                            id="serviceRequestDueDate"
+                            name="dueDate"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                        />
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            id="serviceRequestCancelBtn"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import { actions } from "astro:actions";
+    import { navigate } from "astro:transitions/client";
+
+    const modal = document.getElementById("serviceRequestModal");
+    const form = document.getElementById(
+        "serviceRequestForm",
+    ) as HTMLFormElement;
+    const idInput = document.getElementById(
+        "serviceRequestId",
+    ) as HTMLInputElement;
+    const titleInput = document.getElementById(
+        "serviceRequestTitle",
+    ) as HTMLInputElement;
+    const descriptionInput = document.getElementById(
+        "serviceRequestDescription",
+    ) as HTMLTextAreaElement;
+    const typeInput = document.getElementById(
+        "serviceRequestType",
+    ) as HTMLSelectElement;
+    const priorityInput = document.getElementById(
+        "serviceRequestPriority",
+    ) as HTMLSelectElement;
+    const requesterInput = document.getElementById(
+        "serviceRequestRequester",
+    ) as HTMLSelectElement;
+    const statusInput = document.getElementById(
+        "serviceRequestStatus",
+    ) as HTMLSelectElement;
+    const dueDateInput = document.getElementById(
+        "serviceRequestDueDate",
+    ) as HTMLInputElement;
+    const modalTitle = document.getElementById("serviceRequestModalTitle");
+
+    function editServiceRequest(id: number) {
+        (window as any).openEditServiceRequestModal(id);
+    }
+
+    (window as any).openEditServiceRequestModal = async (id: number) => {
+        const { data, error } = await actions.getServiceRequest({ id });
+        if (error || !data?.data || data.data.length === 0) {
+            alert(error?.message || "Failed to fetch service request");
+            return;
+        }
+
+        const req = data.data[0];
+        if (
+            modal &&
+            idInput &&
+            titleInput &&
+            descriptionInput &&
+            typeInput &&
+            priorityInput &&
+            requesterInput &&
+            statusInput &&
+            dueDateInput
+        ) {
+            idInput.value = String(req.id);
+            titleInput.value = req.title || "";
+            descriptionInput.value = req.description || "";
+            typeInput.value = req.type || "";
+            priorityInput.value = req.priority || "";
+            requesterInput.value = String(req.requesterId);
+            statusInput.value = (req.status || "pending").toLowerCase();
+            dueDateInput.value = req.dueDate
+                ? new Date(req.dueDate).toISOString().slice(0, 10)
+                : "";
+            if (modalTitle) modalTitle.textContent = "Edit Service Request";
+            modal.classList.remove("hidden");
+        }
+    };
+
+    (window as any).openCreateServiceRequestModal = () => {
+        if (
+            modal &&
+            idInput &&
+            titleInput &&
+            descriptionInput &&
+            typeInput &&
+            priorityInput &&
+            requesterInput &&
+            statusInput &&
+            dueDateInput
+        ) {
+            idInput.value = "";
+            titleInput.value = "";
+            descriptionInput.value = "";
+            typeInput.value = "";
+            priorityInput.value = "";
+            requesterInput.value = "";
+            statusInput.value = "pending";
+            dueDateInput.value = "";
+            if (modalTitle) modalTitle.textContent = "Create Service Request";
+            modal.classList.remove("hidden");
+        }
+    };
+
+    document
+        .getElementById("serviceRequestCancelBtn")
+        ?.addEventListener("click", () => {
+            modal?.classList.add("hidden");
+        });
+
+    form?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = idInput?.value ? Number(idInput.value) : null;
+        const title = titleInput?.value?.trim();
+        const requesterId = Number(requesterInput?.value);
+
+        if (!title) {
+            alert("Title is required");
+            return;
+        }
+        if (!requesterId) {
+            alert("Requester is required");
+            return;
+        }
+
+        if (id) {
+            const result = await actions.updateServiceRequest({
+                id,
+                title,
+                description: descriptionInput?.value?.trim() || undefined,
+                type: typeInput?.value || undefined,
+                priority: priorityInput?.value || undefined,
+                requesterId,
+                status: statusInput?.value || "pending",
+                dueDate: dueDateInput?.value || undefined,
+            });
+            if (result.data?.success) {
+                modal?.classList.add("hidden");
+                navigate("/service-requests");
+            } else {
+                alert(
+                    result.error?.message ||
+                        result.data?.message ||
+                        "Failed to update",
+                );
+            }
+        } else {
+            const result = await actions.createServiceRequest({
+                title,
+                description: descriptionInput?.value?.trim() || undefined,
+                type: typeInput?.value || undefined,
+                priority: priorityInput?.value || undefined,
+                requesterId,
+                status: statusInput?.value || "pending",
+                dueDate: dueDateInput?.value || undefined,
+            });
+            if (result.data?.success) {
+                modal?.classList.add("hidden");
+                navigate("/service-requests");
+            } else {
+                alert(
+                    result.error?.message ||
+                        result.data?.message ||
+                        "Failed to create",
+                );
+            }
+        }
+    });
+
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) {
+            modal.classList.add("hidden");
+        }
+    });
+
+    async function cancelServiceRequest(id: number) {
+        if (confirm("Are you sure you want to cancel this service request?")) {
+            const result = await actions.deleteServiceRequest({ id });
+            if (result.data?.success) {
+                window.location.reload();
+            } else {
+                alert(result.error?.message || "Failed to cancel");
+            }
+        }
+    }
+</script>

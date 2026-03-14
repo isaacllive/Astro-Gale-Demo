@@ -121,6 +121,22 @@ export const createAssignment = z.object({
 });
 export type CreateAssignment = z.infer<typeof createAssignment>;
 
+// Role schemas
+export const updateRole = z.object({
+    id: z.number(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    status: z.string().optional(),
+});
+export type UpdateRole = z.infer<typeof updateRole>;
+
+export const createRole = z.object({
+    name: z.string(),
+    description: z.string().optional(),
+    status: z.string().optional(),
+});
+export type CreateRole = z.infer<typeof createRole>;
+
 // Permission schemas
 export const permission = z.object({
     id: z.number().optional(),

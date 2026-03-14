@@ -15,7 +15,7 @@ if (!userId) {
 
 // Parse query parameters
 const query = parseTableQuery(url);
-const { page = 1, pageSize = 10, sortBy, sortOrder = 'asc', search } = query;
+const { page = 1, pageSize = 10, sortBy, sortOrder = "asc", search } = query;
 const offset = (page - 1) * pageSize;
 
 // Build query
@@ -24,19 +24,17 @@ let countQuery = db.select({ count: sql<number>`count(*)` }).from(User);
 
 // Apply search
 if (search) {
-    const searchCondition = or(
-        like(User.username, `%${search}%`)
-    );
+    const searchCondition = or(like(User.username, `%${search}%`));
     userQuery = userQuery.where(searchCondition);
     countQuery = countQuery.where(searchCondition);
 }
 
 // Apply sorting
 if (sortBy) {
-    const orderFn = sortOrder === 'desc' ? desc : asc;
-    if (sortBy === 'username') {
+    const orderFn = sortOrder === "desc" ? desc : asc;
+    if (sortBy === "username") {
         userQuery = userQuery.orderBy(orderFn(User.username));
-    } else if (sortBy === 'id') {
+    } else if (sortBy === "id") {
         userQuery = userQuery.orderBy(orderFn(User.id));
     } else {
         userQuery = userQuery.orderBy(desc(User.id));
@@ -49,10 +47,7 @@ if (sortBy) {
 userQuery = userQuery.limit(pageSize).offset(offset);
 
 // Execute queries
-const [users, countResult] = await Promise.all([
-    userQuery,
-    countQuery,
-]);
+const [users, countResult] = await Promise.all([userQuery, countQuery]);
 
 const totalCount = countResult[0]?.count || 0;
 const response = buildTableResponse(users, totalCount, query);
@@ -60,43 +55,43 @@ const response = buildTableResponse(users, totalCount, query);
 // Define columns
 const columns = [
     {
-        key: 'id',
-        label: 'ID',
+        key: "id",
+        label: "ID",
         sortable: true,
-        className: 'font-mono text-xs',
+        className: "font-mono text-xs",
     },
     {
-        key: 'username',
-        label: 'Username',
+        key: "username",
+        label: "Username",
         sortable: true,
         filterable: true,
     },
     {
-        key: 'lastLogin',
-        label: 'Last Login',
+        key: "lastLogin",
+        label: "Last Login",
         sortable: true,
         render: (value: any) => {
-            if (!value) return 'Never';
+            if (!value) return "Never";
             const date = new Date(value);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            return date.toLocaleDateString() + " " + date.toLocaleTimeString();
         },
     },
     {
-        key: 'status',
-        label: 'Status',
+        key: "status",
+        label: "Status",
         render: (value: any) => {
-            const isActive = value === 'active' || value === 'Active';
-            const bgColor = isActive ? 'rgb(220 252 231)' : 'rgb(243 244 246)';
-            const textColor = isActive ? 'rgb(22 101 52)' : 'rgb(31 41 55)';
-            return `<span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background-color: ${bgColor}; color: ${textColor};">${value || 'N/A'}</span>`;
+            const isActive = value === "active" || value === "Active";
+            const bgColor = isActive ? "rgb(220 252 231)" : "rgb(243 244 246)";
+            const textColor = isActive ? "rgb(22 101 52)" : "rgb(31 41 55)";
+            return `<span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background-color: ${bgColor}; color: ${textColor};">${value || "N/A"}</span>`;
         },
     },
     {
-        key: 'createdAt',
-        label: 'Created',
+        key: "createdAt",
+        label: "Created",
         sortable: true,
         render: (value: any) => {
-            if (!value) return 'N/A';
+            if (!value) return "N/A";
             return new Date(value).toLocaleDateString();
         },
     },
@@ -105,26 +100,24 @@ const columns = [
 // Define actions
 const actions = [
     {
-        label: 'Edit',
-        action: 'edit',
-        icon: '✏️',
-        variant: 'secondary' as const,
-        onClick: 'editUser',
+        label: "Edit",
+        action: "edit",
+        icon: "✏️",
+        variant: "secondary" as const,
+        onClick: "editUser",
     },
     {
-        label: 'Delete',
-        action: 'delete',
-        icon: '🗑️',
-        variant: 'danger' as const,
-        onClick: 'deleteUser',
+        label: "Delete",
+        action: "delete",
+        icon: "🗑️",
+        variant: "danger" as const,
+        onClick: "deleteUser",
     },
 ];
 ---
 
 <Layout title="Users">
-    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="px-4 py-6 sm:px-0">
-            <DataTable
+    <DataTable
                 title="Users"
                 description="Manage system users and their permissions"
                 data={response.data}
@@ -140,25 +133,177 @@ const actions = [
                 showSearch={true}
                 showExport={true}
                 showColumnToggle={true}
+                addNewOnClick="openAddUserModal"
+                addNewLabel="Add User"
             />
+    <!-- Edit User Modal -->
+    <div id="userModal" class="modal-overlay hidden" aria-hidden="true">
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
+            <h3 class="modal-title" id="userModalTitle">Edit User</h3>
+            <form id="userForm" class="space-y-4">
+                <input type="hidden" id="userId" />
+                <div>
+                    <label for="userUsername" class="form-label">Username</label>
+                    <input type="text" id="userUsername" name="username" required class="form-input" placeholder="Username" />
+                </div>
+                <div>
+                    <label for="userPassword" class="form-label">Password</label>
+                    <input type="password" id="userPassword" name="password" class="form-input" placeholder="Leave blank to keep current" />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave blank to keep current password</p>
+                </div>
+                <div>
+                    <label for="userStatus" class="form-label">Status</label>
+                    <select id="userStatus" name="status" required class="form-select">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="new">New</option>
+                        <option value="deleted">Deleted</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" id="userCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 </Layout>
 
 <script>
+    import { actions } from "astro:actions";
+    import { navigate } from "astro:transitions/client";
+
+    const userModal = document.getElementById("userModal");
+    const userForm = document.getElementById("userForm") as HTMLFormElement;
+    const userModalTitle = document.getElementById("userModalTitle");
+    const userIdInput = document.getElementById("userId") as HTMLInputElement;
+    const userUsernameInput = document.getElementById(
+        "userUsername",
+    ) as HTMLInputElement;
+    const userPasswordInput = document.getElementById(
+        "userPassword",
+    ) as HTMLInputElement;
+    const userStatusInput = document.getElementById(
+        "userStatus",
+    ) as HTMLSelectElement;
+
     function editUser(id: number) {
-        console.log('Edit user:', id);
-        window.location.href = `/users/${id}/edit`;
+        (window as any).openEditUserModal(id);
     }
 
-    function deleteUser(id: number) {
-        if (confirm('Are you sure you want to delete this user?')) {
-            console.log('Delete user:', id);
-            fetch(`/api/users/${id}`, {
-                method: 'DELETE',
-            }).then(() => {
-                window.location.reload();
+    (window as any).openAddUserModal = () => {
+        if (
+            userModal &&
+            userModalTitle &&
+            userIdInput &&
+            userUsernameInput &&
+            userPasswordInput &&
+            userStatusInput
+        ) {
+            userModalTitle.textContent = "Add User";
+            userIdInput.value = "";
+            userUsernameInput.value = "";
+            userPasswordInput.value = "";
+            userPasswordInput.required = true;
+            userStatusInput.value = "active";
+            userModal.classList.remove("hidden");
+        }
+    };
+
+    (window as any).openEditUserModal = async (id: number) => {
+        const { data, error } = await actions.getUser({ id });
+        if (error || !data?.data || data.data.length === 0) {
+            alert(error?.message || "Failed to fetch user");
+            return;
+        }
+
+        const user = data.data[0];
+        if (
+            userModal &&
+            userModalTitle &&
+            userIdInput &&
+            userUsernameInput &&
+            userPasswordInput &&
+            userStatusInput
+        ) {
+            userModalTitle.textContent = "Edit User";
+            userIdInput.value = String(user.id);
+            userUsernameInput.value = user.username || "";
+            userPasswordInput.value = "";
+            userPasswordInput.required = false;
+            userStatusInput.value = (user.status || "active").toLowerCase();
+            userModal.classList.remove("hidden");
+        }
+    };
+
+    document.getElementById("userCancelBtn")?.addEventListener("click", () => {
+        userModal?.classList.add("hidden");
+    });
+
+    userForm?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const idRaw = userIdInput?.value?.trim();
+        const id = idRaw ? Number(idRaw) : 0;
+        const username = userUsernameInput?.value?.trim();
+        const password = userPasswordInput?.value;
+        const status = userStatusInput?.value || "active";
+
+        if (id) {
+            const payload: {
+                id: number;
+                username: string;
+                status: string;
+                password?: string;
+            } = {
+                id,
+                username: username || "",
+                status,
+            };
+            if (password) payload.password = password;
+            const result = await actions.updateUser(payload);
+            if (result.data?.success) {
+                userModal?.classList.add("hidden");
+                navigate("/users");
+            } else {
+                alert(
+                    result.error?.message ||
+                        result.data?.message ||
+                        "Failed to update user",
+                );
+            }
+        } else {
+            const result = await actions.createUser({
+                username: username || "",
+                password: password || "",
+                status,
             });
+            if (result.data?.success) {
+                userModal?.classList.add("hidden");
+                navigate("/users");
+            } else {
+                alert(
+                    result.error?.message ||
+                        result.data?.message ||
+                        "Failed to create user",
+                );
+            }
+        }
+    });
+
+    userModal?.addEventListener("click", (e) => {
+        if (e.target === userModal) {
+            userModal.classList.add("hidden");
+        }
+    });
+
+    async function deleteUser(id: number) {
+        if (confirm("Are you sure you want to delete this user?")) {
+            const result = await actions.deleteUser({ id });
+            if (result.data?.success) {
+                navigate("/users");
+            } else {
+                alert(result.error?.message || "Failed to delete user");
+            }
         }
     }
 </script>

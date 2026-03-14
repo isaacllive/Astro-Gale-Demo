@@ -1,0 +1,364 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { db, Person } from "astro:db";
+import { eq } from "astro:db";
+
+const { cookies, redirect, params } = Astro;
+
+// Check authentication
+const userId = cookies.get("user-id");
+if (!userId) {
+    return redirect("/login?error=Please login to edit person");
+}
+
+const id = parseInt(params?.id ?? "");
+if (isNaN(id)) {
+    return redirect("/persons?error=Invalid person ID");
+}
+
+const persons = await db.select().from(Person).where(eq(Person.id, id));
+if (persons.length === 0) {
+    return redirect("/persons?error=Person not found");
+}
+
+const person = persons[0];
+// Format date for input[type=date]
+const dateOfBirthStr = person.dateOfBirth
+    ? new Date(person.dateOfBirth).toISOString().slice(0, 10)
+    : "";
+---
+
+<Layout title={`Edit ${person.firstName} ${person.lastName}`}>
+    <div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <div class="mb-6">
+                <a
+                    href={`/persons/${person.id}`}
+                    class="text-sm text-primary-600 hover:text-primary-800 mb-2 inline-block"
+                >
+                    ← Back to Person
+                </a>
+                <h1 class="text-3xl font-bold text-gray-900">Edit Person</h1>
+                <p class="mt-1 text-sm text-gray-500">
+                    {person.firstName}
+                    {person.lastName} (#{person.id})
+                </p>
+            </div>
+
+            <div class="bg-white shadow rounded-lg">
+                <form id="personForm" class="p-6 space-y-6">
+                    <input type="hidden" id="personId" value={person.id} />
+
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div>
+                            <label
+                                for="firstName"
+                                class="block text-sm font-medium text-gray-700"
+                                >First Name</label
+                            >
+                            <input
+                                type="text"
+                                id="firstName"
+                                name="firstName"
+                                value={person.firstName || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="lastName"
+                                class="block text-sm font-medium text-gray-700"
+                                >Last Name</label
+                            >
+                            <input
+                                type="text"
+                                id="lastName"
+                                name="lastName"
+                                value={person.lastName || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="email"
+                                class="block text-sm font-medium text-gray-700"
+                                >Email</label
+                            >
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value={person.email || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="phone"
+                                class="block text-sm font-medium text-gray-700"
+                                >Phone</label
+                            >
+                            <input
+                                type="text"
+                                id="phone"
+                                name="phone"
+                                value={person.phone || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="dateOfBirth"
+                                class="block text-sm font-medium text-gray-700"
+                                >Date of Birth</label
+                            >
+                            <input
+                                type="date"
+                                id="dateOfBirth"
+                                name="dateOfBirth"
+                                value={dateOfBirthStr}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="gender"
+                                class="block text-sm font-medium text-gray-700"
+                                >Gender</label
+                            >
+                            <select
+                                id="gender"
+                                name="gender"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            >
+                                <option value="">Select...</option>
+                                <option
+                                    value="male"
+                                    selected={person.gender === "male"}
+                                    >Male</option
+                                >
+                                <option
+                                    value="female"
+                                    selected={person.gender === "female"}
+                                    >Female</option
+                                >
+                                <option
+                                    value="other"
+                                    selected={person.gender === "other"}
+                                    >Other</option
+                                >
+                                <option
+                                    value="prefer not to say"
+                                    selected={person.gender ===
+                                        "prefer not to say"}
+                                    >Prefer not to say</option
+                                >
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                for="status"
+                                class="block text-sm font-medium text-gray-700"
+                                >Status</label
+                            >
+                            <select
+                                id="status"
+                                name="status"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            >
+                                <option
+                                    value="active"
+                                    selected={person.status === "active" ||
+                                        person.status === "Active"}
+                                    >Active</option
+                                >
+                                <option
+                                    value="inactive"
+                                    selected={person.status === "inactive"}
+                                    >Inactive</option
+                                >
+                                <option
+                                    value="new"
+                                    selected={person.status === "new"}
+                                    >New</option
+                                >
+                                <option
+                                    value="deleted"
+                                    selected={person.status === "deleted"}
+                                    >Deleted</option
+                                >
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label
+                            for="address"
+                            class="block text-sm font-medium text-gray-700"
+                            >Address</label
+                        >
+                        <input
+                            type="text"
+                            id="address"
+                            name="address"
+                            value={person.address || ""}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                        />
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                        <div>
+                            <label
+                                for="city"
+                                class="block text-sm font-medium text-gray-700"
+                                >City</label
+                            >
+                            <input
+                                type="text"
+                                id="city"
+                                name="city"
+                                value={person.city || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="state"
+                                class="block text-sm font-medium text-gray-700"
+                                >State</label
+                            >
+                            <input
+                                type="text"
+                                id="state"
+                                name="state"
+                                value={person.state || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="zipCode"
+                                class="block text-sm font-medium text-gray-700"
+                                >ZIP Code</label
+                            >
+                            <input
+                                type="text"
+                                id="zipCode"
+                                name="zipCode"
+                                value={person.zipCode || ""}
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label
+                            for="country"
+                            class="block text-sm font-medium text-gray-700"
+                            >Country</label
+                        >
+                        <input
+                            type="text"
+                            id="country"
+                            name="country"
+                            value={person.country || ""}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                        />
+                    </div>
+
+                    <div
+                        class="flex justify-end space-x-3 pt-4 border-t border-gray-200"
+                    >
+                        <a
+                            href={`/persons/${person.id}`}
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                        >
+                            Cancel
+                        </a>
+                        <button
+                            type="submit"
+                            class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import { actions } from "astro:actions";
+    import { navigate } from "astro:transitions/client";
+
+    const form = document.getElementById("personForm") as HTMLFormElement;
+
+    form?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const id = Number(
+            (document.getElementById("personId") as HTMLInputElement)?.value,
+        );
+        const dateOfBirthInput = (
+            document.getElementById("dateOfBirth") as HTMLInputElement
+        )?.value;
+
+        const payload: Record<string, unknown> = {
+            id,
+            firstName:
+                (
+                    document.getElementById("firstName") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            lastName:
+                (
+                    document.getElementById("lastName") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            email:
+                (
+                    document.getElementById("email") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            phone:
+                (
+                    document.getElementById("phone") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            address:
+                (
+                    document.getElementById("address") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            city:
+                (
+                    document.getElementById("city") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            state:
+                (
+                    document.getElementById("state") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            zipCode:
+                (
+                    document.getElementById("zipCode") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            country:
+                (
+                    document.getElementById("country") as HTMLInputElement
+                )?.value?.trim() || undefined,
+            gender:
+                (document.getElementById("gender") as HTMLSelectElement)
+                    ?.value || undefined,
+            status:
+                (document.getElementById("status") as HTMLSelectElement)
+                    ?.value || undefined,
+        };
+
+        if (dateOfBirthInput) {
+            payload.dateOfBirth = new Date(dateOfBirthInput);
+        }
+
+        const result = await actions.updatePerson(payload as any);
+        if (result.data?.success) {
+            navigate(`/persons/${id}`);
+        } else {
+            alert(result.error?.message || "Failed to update person");
+        }
+    });
+</script>

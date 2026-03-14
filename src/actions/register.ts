@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { STATUSES, OBJECT_TYPES, ASSIGNMENT_TYPES } from '../shared/constants';
 
 export const register = defineAction({
-    accept: 'form',
     input: z.object({
         username: z.string()
             .min(3, 'Username must be at least 3 characters')

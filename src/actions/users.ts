@@ -36,14 +36,16 @@ export const updateUser = defineAction({
         status: z.string().optional(),
     }),
     handler: async (input) => {
+        const updates: Record<string, any> = {
+            updatedAt: new Date(),
+            updatedBy: 1,
+        };
+        if (input.username !== undefined) updates.username = input.username;
+        if (input.password !== undefined && input.password !== '') updates.password = input.password;
+        if (input.status !== undefined) updates.status = input.status;
+
         await db.update(User)
-            .set({
-                status: input.status,
-                username: input.username,
-                password: input.password,
-                updatedAt: new Date(),
-                updatedBy: 1,
-            })
+            .set(updates)
             .where(eq(User.id, input.id));
 
         return { success: true, message: "User updated successfully" };

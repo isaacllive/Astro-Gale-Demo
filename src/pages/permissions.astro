@@ -22,8 +22,11 @@ const query = parseTableQuery(url);
 const { page = 1, pageSize = 10, sortBy, sortOrder = 'asc', search } = query;
 const offset = (page - 1) * pageSize;
 
-// Fetch users for subject dropdown
-const allUsers = await db.select().from(User);
+// Fetch users for subject dropdown and all permission defs for assignment form
+const [allUsers, allPermissionDefs] = await Promise.all([
+    db.select().from(User),
+    db.select({ id: PermissionDef.id, objectType: PermissionDef.objectType, resourceType: PermissionDef.resourceType, resourceName: PermissionDef.resourceName }).from(PermissionDef),
+]);
 
 // Handle Permission Definitions tab
 let defs: any[] = [];
@@ -244,7 +247,7 @@ const assignedColumns = [
         sortable: true,
         render: (value: any) => {
             const colors: Record<string, string> = {
-                'USER': 'bg-indigo-100 text-indigo-800',
+                'USER': 'bg-primary-100 text-primary-800',
                 'ROLE': 'bg-pink-100 text-pink-800',
                 'GROUP': 'bg-yellow-100 text-yellow-800',
                 'SYSTEM': 'bg-gray-100 text-gray-800',
@@ -331,16 +334,14 @@ const assignedActions = [
 ---
 
 <Layout title="Permissions">
-    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="px-4 py-6 sm:px-0">
-            <!-- Tabs -->
+    <!-- Tabs -->
             <div class="mb-6 border-b border-gray-200">
                 <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                     <a
                         href="/permissions?tab=definitions"
                         class={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                             activeTab === 'definitions'
-                                ? 'border-indigo-500 text-indigo-600'
+                                ? 'border-primary-500 text-primary-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                     >
@@ -350,7 +351,7 @@ const assignedActions = [
                         href="/permissions?tab=assignments"
                         class={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                             activeTab === 'assignments'
-                                ? 'border-indigo-500 text-indigo-600'
+                                ? 'border-primary-500 text-primary-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                     >
@@ -363,7 +364,7 @@ const assignedActions = [
             <div class="mb-6">
                 <button
                     id={`add${activeTab === 'definitions' ? 'Def' : 'Assigned'}Btn`}
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                     Add {activeTab === 'definitions' ? 'Permission Definition' : 'Permission Assignment'}
                 </button>
@@ -387,6 +388,8 @@ const assignedActions = [
                     showSearch={true}
                     showExport={true}
                     showColumnToggle={true}
+                    addNewOnClick="openAddDefModal"
+                    addNewLabel="Add Permission Definition"
                 />
             ) : (
                 <DataTable
@@ -405,62 +408,303 @@ const assignedActions = [
                     showSearch={true}
                     showExport={true}
                     showColumnToggle={true}
+                    addNewOnClick="openAddAssignedModal"
+                    addNewLabel="Add Permission Assignment"
                 />
             )}
+
+    <!-- Permission Definition Add/Edit Modal -->
+    <div id="defModal" class="modal-overlay hidden" aria-hidden="true">
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="defModalTitle">
+            <h3 class="modal-title" id="defModalTitle">Edit Permission Definition</h3>
+            <form id="defForm" class="space-y-4">
+                <input type="hidden" id="defId" />
+                <div>
+                    <label for="defObjectType" class="form-label">Object Type</label>
+                    <input type="text" id="defObjectType" name="objectType" required class="form-input" placeholder="e.g. USER, PERSON" />
+                </div>
+                <div>
+                    <label for="defResourceType" class="form-label">Resource Type</label>
+                    <select id="defResourceType" name="resourceType" required class="form-select">
+                        <option value="">— Select —</option>
+                        {Object.values(PERMISSION_RESOURCE_TYPES).map((t) => (
+                            <option value={t}>{t}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label for="defResourceName" class="form-label">Resource Name</label>
+                    <input type="text" id="defResourceName" name="resourceName" required class="form-input" placeholder="e.g. users:read" />
+                </div>
+                <div>
+                    <label for="defDescription" class="form-label">Description</label>
+                    <textarea id="defDescription" name="description" rows="2" class="form-input" placeholder="Optional"></textarea>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="defIsActive" name="isActive" checked class="rounded border-gray-300" />
+                    <label for="defIsActive" class="form-label mb-0">Active</label>
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" id="defCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Permission Assignment Add/Edit Modal -->
+    <div id="assignedModal" class="modal-overlay hidden" aria-hidden="true">
+        <div class="modal-panel max-w-md" role="dialog" aria-modal="true" aria-labelledby="assignedModalTitle">
+            <h3 class="modal-title" id="assignedModalTitle">Edit Permission Assignment</h3>
+            <form id="assignedForm" class="space-y-4">
+                <input type="hidden" id="assignedId" />
+                <div>
+                    <label for="assignedPermissionDefId" class="form-label">Permission</label>
+                    <select id="assignedPermissionDefId" name="permissionDefId" required class="form-select">
+                        <option value="">— Select —</option>
+                        {allPermissionDefs.map((d) => (
+                            <option value={d.id}>{d.resourceName} ({d.objectType} / {d.resourceType})</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label for="assignedSubjectType" class="form-label">Subject Type</label>
+                    <select id="assignedSubjectType" name="subjectType" required class="form-select">
+                        {Object.values(PERMISSION_SUBJECT_TYPES).map((t) => (
+                            <option value={t}>{t}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label for="assignedSubjectId" class="form-label">Subject ID (optional, for USER)</label>
+                    <select id="assignedSubjectId" name="subjectId" class="form-select">
+                        <option value="">— All / N/A —</option>
+                        {allUsers.map((u) => (
+                            <option value={u.id}>{u.username} (#{u.id})</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label for="assignedEffect" class="form-label">Effect</label>
+                    <select id="assignedEffect" name="effect" required class="form-select">
+                        {Object.values(PERMISSION_EFFECTS).map((e) => (
+                            <option value={e}>{e}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label for="assignedPriority" class="form-label">Priority</label>
+                    <input type="number" id="assignedPriority" name="priority" value="0" min="0" class="form-input" />
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" id="assignedCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 </Layout>
 
 <script>
-    function editPermissionDef(id: number) {
-        console.log('Edit permission definition:', id);
-        // TODO: Open edit modal or navigate to edit page
-    }
+    import { actions } from 'astro:actions';
+    import { navigate } from 'astro:transitions/client';
 
-    function deletePermissionDef(id: number) {
+    const defModal = document.getElementById('defModal');
+    const defForm = document.getElementById('defForm') as HTMLFormElement;
+    const defModalTitle = document.getElementById('defModalTitle');
+    const defIdInput = document.getElementById('defId') as HTMLInputElement;
+    const defObjectTypeInput = document.getElementById('defObjectType') as HTMLInputElement;
+    const defResourceTypeInput = document.getElementById('defResourceType') as HTMLSelectElement;
+    const defResourceNameInput = document.getElementById('defResourceName') as HTMLInputElement;
+    const defDescriptionInput = document.getElementById('defDescription') as HTMLTextAreaElement;
+    const defIsActiveInput = document.getElementById('defIsActive') as HTMLInputElement;
+
+    const assignedModal = document.getElementById('assignedModal');
+    const assignedForm = document.getElementById('assignedForm') as HTMLFormElement;
+    const assignedModalTitle = document.getElementById('assignedModalTitle');
+    const assignedIdInput = document.getElementById('assignedId') as HTMLInputElement;
+    const assignedPermissionDefIdInput = document.getElementById('assignedPermissionDefId') as HTMLSelectElement;
+    const assignedSubjectTypeInput = document.getElementById('assignedSubjectType') as HTMLSelectElement;
+    const assignedSubjectIdInput = document.getElementById('assignedSubjectId') as HTMLSelectElement;
+    const assignedEffectInput = document.getElementById('assignedEffect') as HTMLSelectElement;
+    const assignedPriorityInput = document.getElementById('assignedPriority') as HTMLInputElement;
+
+    (window as any).openAddDefModal = () => {
+        if (defModal && defModalTitle && defIdInput && defObjectTypeInput && defResourceTypeInput && defResourceNameInput && defDescriptionInput && defIsActiveInput) {
+            defModalTitle.textContent = 'Add Permission Definition';
+            defIdInput.value = '';
+            defObjectTypeInput.value = '';
+            defResourceTypeInput.value = '';
+            defResourceNameInput.value = '';
+            defDescriptionInput.value = '';
+            defIsActiveInput.checked = true;
+            defModal.classList.remove('hidden');
+        }
+    };
+
+    (window as any).editPermissionDef = async (id: number) => {
+        const { data, error } = await actions.getPermissionDef({ id });
+        if (error || !data?.data || data.data.length === 0) {
+            alert(error?.message || 'Failed to fetch permission definition');
+            return;
+        }
+        const def = data.data[0];
+        if (defModal && defModalTitle && defIdInput && defObjectTypeInput && defResourceTypeInput && defResourceNameInput && defDescriptionInput && defIsActiveInput) {
+            defModalTitle.textContent = 'Edit Permission Definition';
+            defIdInput.value = String(def.id);
+            defObjectTypeInput.value = def.objectType || '';
+            defResourceTypeInput.value = def.resourceType || '';
+            defResourceNameInput.value = def.resourceName || '';
+            defDescriptionInput.value = def.description || '';
+            defIsActiveInput.checked = def.isActive !== false;
+            defModal.classList.remove('hidden');
+        }
+    };
+
+    async function deletePermissionDef(id: number) {
         if (confirm('Are you sure you want to delete this permission definition?')) {
-            console.log('Delete permission definition:', id);
-            fetch(`/api/permissions/definitions/${id}`, {
-                method: 'DELETE',
-            }).then(() => {
-                window.location.reload();
-            });
+            const result = await actions.deletePermissionDef({ id });
+            if (result.data?.success) {
+                navigate('/permissions?tab=definitions');
+            } else {
+                alert(result.error?.message || 'Failed to delete');
+            }
         }
     }
 
-    function editPermissionAssigned(id: number) {
-        console.log('Edit permission assignment:', id);
-        // TODO: Open edit modal or navigate to edit page
-    }
+    (window as any).openAddAssignedModal = () => {
+        if (assignedModal && assignedModalTitle && assignedIdInput && assignedPermissionDefIdInput && assignedSubjectTypeInput && assignedSubjectIdInput && assignedEffectInput && assignedPriorityInput) {
+            assignedModalTitle.textContent = 'Add Permission Assignment';
+            assignedIdInput.value = '';
+            assignedPermissionDefIdInput.value = '';
+            assignedSubjectTypeInput.value = 'USER';
+            assignedSubjectIdInput.value = '';
+            assignedEffectInput.value = 'ALLOW';
+            assignedPriorityInput.value = '0';
+            assignedModal.classList.remove('hidden');
+        }
+    };
 
-    function deletePermissionAssigned(id: number) {
+    (window as any).editPermissionAssigned = async (id: number) => {
+        const { data, error } = await actions.getPermissionAssigned({ id });
+        if (error || !data?.data || data.data.length === 0) {
+            alert(error?.message || 'Failed to fetch permission assignment');
+            return;
+        }
+        const a = data.data[0];
+        if (assignedModal && assignedModalTitle && assignedIdInput && assignedPermissionDefIdInput && assignedSubjectTypeInput && assignedSubjectIdInput && assignedEffectInput && assignedPriorityInput) {
+            assignedModalTitle.textContent = 'Edit Permission Assignment';
+            assignedIdInput.value = String(a.id);
+            assignedPermissionDefIdInput.value = String(a.permissionDefId);
+            assignedSubjectTypeInput.value = a.subjectType || 'USER';
+            assignedSubjectIdInput.value = a.subjectId != null ? String(a.subjectId) : '';
+            assignedEffectInput.value = a.effect || 'ALLOW';
+            assignedPriorityInput.value = String(a.priority ?? 0);
+            assignedModal.classList.remove('hidden');
+        }
+    };
+
+    async function deletePermissionAssigned(id: number) {
         if (confirm('Are you sure you want to delete this permission assignment?')) {
-            console.log('Delete permission assignment:', id);
-            fetch(`/api/permissions/assignments/${id}`, {
-                method: 'DELETE',
-            }).then(() => {
-                window.location.reload();
-            });
+            const result = await actions.deletePermissionAssigned({ id });
+            if (result.data?.success) {
+                navigate('/permissions?tab=assignments');
+            } else {
+                alert(result.error?.message || 'Failed to delete');
+            }
         }
     }
 
-    // Handle add buttons
-    document.addEventListener('DOMContentLoaded', () => {
-        const addDefBtn = document.getElementById('addDefBtn');
-        const addAssignedBtn = document.getElementById('addAssignedBtn');
-        
-        if (addDefBtn) {
-            addDefBtn.addEventListener('click', () => {
-                // TODO: Open add modal for permission definition
-                console.log('Add permission definition');
+    document.getElementById('defCancelBtn')?.addEventListener('click', () => defModal?.classList.add('hidden'));
+    document.getElementById('assignedCancelBtn')?.addEventListener('click', () => assignedModal?.classList.add('hidden'));
+
+    defForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = defIdInput?.value?.trim();
+        const objectType = defObjectTypeInput?.value?.trim();
+        const resourceType = defResourceTypeInput?.value;
+        const resourceName = defResourceNameInput?.value?.trim();
+        const description = defDescriptionInput?.value?.trim() || undefined;
+        const isActive = defIsActiveInput?.checked ?? true;
+
+        if (id) {
+            const result = await actions.updatePermissionDef({
+                id: Number(id),
+                objectType,
+                resourceType,
+                resourceName,
+                description,
+                isActive,
             });
-        }
-        
-        if (addAssignedBtn) {
-            addAssignedBtn.addEventListener('click', () => {
-                // TODO: Open add modal for permission assignment
-                console.log('Add permission assignment');
+            if (result.data?.success) {
+                defModal?.classList.add('hidden');
+                navigate('/permissions?tab=definitions');
+            } else {
+                alert(result.error?.message || result.data?.message || 'Failed to update');
+            }
+        } else {
+            const result = await actions.createPermissionDef({
+                objectType: objectType || '',
+                resourceType: resourceType || '',
+                resourceName: resourceName || '',
+                description,
+                isActive,
             });
+            if (result.data?.success) {
+                defModal?.classList.add('hidden');
+                navigate('/permissions?tab=definitions');
+            } else {
+                alert(result.error?.message || result.data?.message || 'Failed to create');
+            }
         }
     });
+
+    assignedForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = assignedIdInput?.value?.trim();
+        const permissionDefId = Number(assignedPermissionDefIdInput?.value);
+        const subjectType = assignedSubjectTypeInput?.value;
+        const subjectIdRaw = assignedSubjectIdInput?.value;
+        const subjectId = subjectIdRaw === '' ? undefined : Number(subjectIdRaw);
+        const effect = assignedEffectInput?.value;
+        const priority = Number(assignedPriorityInput?.value || 0);
+
+        if (id) {
+            const result = await actions.updatePermissionAssigned({
+                id: Number(id),
+                permissionDefId,
+                subjectType,
+                subjectId: subjectId ?? null,
+                effect,
+                priority,
+            });
+            if (result.data?.success) {
+                assignedModal?.classList.add('hidden');
+                navigate('/permissions?tab=assignments');
+            } else {
+                alert(result.error?.message || result.data?.message || 'Failed to update');
+            }
+        } else {
+            const result = await actions.createPermissionAssigned({
+                permissionDefId,
+                subjectType: subjectType || 'USER',
+                subjectId: subjectId ?? null,
+                effect: effect || 'ALLOW',
+                priority,
+            });
+            if (result.data?.success) {
+                assignedModal?.classList.add('hidden');
+                navigate('/permissions?tab=assignments');
+            } else {
+                alert(result.error?.message || result.data?.message || 'Failed to create');
+            }
+        }
+    });
+
+    defModal?.addEventListener('click', (e) => { if (e.target === defModal) defModal.classList.add('hidden'); });
+    assignedModal?.addEventListener('click', (e) => { if (e.target === assignedModal) assignedModal.classList.add('hidden'); });
+
+    // Page Add buttons (above table)
+    document.getElementById('addDefBtn')?.addEventListener('click', () => (window as any).openAddDefModal?.());
+    document.getElementById('addAssignedBtn')?.addEventListener('click', () => (window as any).openAddAssignedModal?.());
 </script>

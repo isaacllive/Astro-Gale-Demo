@@ -1,159 +1,245 @@
+---
+import { db, User, Notification } from "astro:db";
+import { eq, and, desc, or, ne } from "astro:db";
+
+const { cookies } = Astro;
+let user: typeof User.$inferSelect | null = null;
+let unreadCount = 0;
+let recentNotifications: (typeof Notification.$inferSelect)[] = [];
+
+const userIdCookie = cookies.get("user-id");
+if (userIdCookie?.value) {
+    try {
+        const userId = parseInt(userIdCookie.value);
+        const users = await db.select().from(User).where(eq(User.id, userId)).limit(1);
+        if (users.length > 0) {
+            user = users[0];
+            const allNotifications = await db.select()
+                .from(Notification)
+                .where(
+                    and(
+                        eq(Notification.userId, userId),
+                        or(eq(Notification.status, "Active"), ne(Notification.status, "deleted"))
+                    )
+                )
+                .orderBy(desc(Notification.createdAt))
+                .limit(5);
+            unreadCount = allNotifications.filter((n) => !n.isRead).length;
+            recentNotifications = allNotifications;
+        }
+    } catch (e) {
+        console.error("Sidebar: error fetching user/notifications", e);
+    }
+}
+
+function formatDate(date: Date | null) {
+    if (!date) return "Just now";
+    const d = new Date(date);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString();
+}
+---
+
 <aside
     id="sidebar"
-    class="w-64 bg-gray-800 text-white transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out z-20 min-h-[calc(100vh-4rem)]"
+    class="sidebar shrink-0 self-start my-2 text-gray-900 dark:text-white bg-primary-600/90 dark:bg-primary-700/80 text-white rounded-2xl shadow-md transition-[width,height] duration-200 ease-in-out overflow-hidden"
+    style="width: var(--sidebar-width, 13rem); height: var(--sidebar-height, auto);"
+    aria-label="Navigation menu"
+    :data-collapsed="collapsed"
+    :aria-expanded="!collapsed"
+    x-data="{
+        collapsed: typeof localStorage !== 'undefined' && localStorage.getItem('sidebar-collapsed') === 'true',
+        get width() { return this.collapsed ? '3rem' : '13rem'; },
+        get height() { return this.collapsed ? '3rem' : 'auto'; },
+        toggle() {
+            this.collapsed = !this.collapsed;
+            if (typeof localStorage !== 'undefined') localStorage.setItem('sidebar-collapsed', this.collapsed);
+            document.documentElement.style.setProperty('--sidebar-width', this.width);
+            document.documentElement.style.setProperty('--sidebar-height', this.height);
+        }
+    }"
+    x-init="
+        $nextTick(() => {
+            document.documentElement.style.setProperty('--sidebar-width', width);
+            document.documentElement.style.setProperty('--sidebar-height', height);
+        });
+        $watch('collapsed', () => {
+            document.documentElement.style.setProperty('--sidebar-width', width);
+            document.documentElement.style.setProperty('--sidebar-height', height);
+        });
+    "
 >
-    <div class="flex flex-col h-full">
-        <!-- Sidebar Header with Collapse Button -->
-        <div
-            class="flex items-center justify-between h-16 border-b border-gray-700 px-4"
-        >
-            <h2 class="text-xl font-semibold">Menu</h2>
+    <div class="sidebar-inner flex w-full min-w-[3rem] flex-col gap-3 overflow-visible">
+        <!-- Header: "Menu" when expanded; when collapsed only menu icon (same icon toggles) -->
+        <div class="sidebar-header flex items-center px-1 pt-1 pb-2 shrink-0">
+            <a href="/" class="sidebar-title px-3 py-3 min-w-0 flex-1 rounded-lg hover:bg-gray-100/80 dark:hover:bg-gray-600/80 transition-colors text-sm font-semibold tracking-tight text-gray-800 dark:text-gray-100 whitespace-nowrap overflow-hidden" title="Home" x-show="!collapsed" x-transition>
+                Menu
+            </a>
             <button
-                id="collapse-button"
-                class="p-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600"
-                aria-label="Toggle sidebar"
+                type="button"
+                @click="toggle()"
+                class="sidebar-menu-btn flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600/80 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                :title="collapsed ? 'Open menu' : 'Collapse menu'"
+                :aria-label="collapsed ? 'Open menu' : 'Collapse menu'"
             >
-                <svg
-                    class="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+                <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                 </svg>
             </button>
         </div>
 
-        <!-- Navigation Links -->
-        <nav class="flex-1 px-4 py-4 space-y-2">
-            <a
-                href="/"
-                class="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors"
-            >
-                <svg
-                    class="w-5 h-5 mr-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                    ></path>
-                </svg>
-                Dashboard
-            </a>
-            <a
-                href="/users"
-                class="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors"
-            >
-                <svg
-                    class="w-5 h-5 mr-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                    ></path>
-                </svg>
-                Users
-            </a>
-            <a
-                href="/profile"
-                class="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors"
-            >
-                <svg
-                    class="w-5 h-5 mr-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    ></path>
-                </svg>
-                Profile
-            </a>
-            <a
-                href="/settings"
-                class="flex items-center px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors"
-            >
-                <svg
-                    class="w-5 h-5 mr-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    ></path>
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                Settings
-            </a>
-        </nav>
-
-        <!-- Sidebar Footer -->
-        <div class="p-4 border-t border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <img
-                        class="h-8 w-8 rounded-full"
-                        src="https://via.placeholder.com/32"
-                        alt="User avatar"
-                    />
+        <!-- Profile & Notifications cards (when expanded and logged in) -->
+        {user && (
+            <section class="sidebar-section px-2" x-show="!collapsed" x-transition>
+                <!-- Profile card (collapsible, default collapsed) -->
+                <div class="sidebar-card" x-data="{ open: false }">
+                    <button type="button" @click="open = !open" class="sidebar-card-header w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-gray-100/80 dark:hover:bg-gray-600/50 transition-colors">
+                        <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400">
+                            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        </span>
+                        <span class="min-w-0 flex-1 text-left">
+                            <p class="text-[11px] font-semibold text-gray-800 dark:text-gray-200 truncate">{user.username ?? "User"}</p>
+                        </span>
+                        <svg class="size-3.5 text-gray-500 dark:text-gray-400 shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-gray-200/60 dark:border-gray-700/50 px-3 py-2 space-y-1">
+                        <a href="/profile" class="flex items-center gap-2 text-[11px] font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            View profile
+                        </a>
+                        <button type="button" class="logout-btn w-full flex items-center justify-center gap-2 px-2 py-1.5 text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" title="Sign out">
+                            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                            Sign out
+                        </button>
+                    </div>
                 </div>
-                <div class="ml-3">
-                    <p class="text-sm font-medium text-white">User Name</p>
-                    <p class="text-xs text-gray-300">user@example.com</p>
+
+                <!-- Notifications card (collapsible, default collapsed) -->
+                <div class="sidebar-card" x-data="{ open: false }">
+                    <button type="button" @click="open = !open" class="sidebar-card-header w-full px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-gray-100/80 dark:hover:bg-gray-600/50 transition-colors">
+                        <h3 class="text-xs font-semibold text-gray-700 dark:text-gray-300">Notifications</h3>
+                        <span class="flex items-center gap-1.5 shrink-0">
+                            {unreadCount > 0 && (
+                                <span class="text-[10px] font-medium text-primary-600 dark:text-primary-400">{unreadCount} unread</span>
+                            )}
+                            <svg class="size-3.5 text-gray-500 dark:text-gray-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </span>
+                    </button>
+                    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-gray-200/60 dark:border-gray-700/50">
+                        <div class="max-h-36 overflow-y-auto">
+                            {recentNotifications.length === 0 ? (
+                                <p class="px-3 py-3 text-[11px] text-gray-500 dark:text-gray-400">No notifications</p>
+                            ) : (
+                                <ul class="divide-y divide-gray-200/60 dark:divide-gray-700/50">
+                                    {recentNotifications.map((n) => (
+                                        <li class={`px-3 py-2 ${!n.isRead ? "bg-primary-50/50 dark:bg-primary-500/10" : ""}`}>
+                                            <p class="text-[11px] font-medium text-gray-800 dark:text-gray-200 truncate">{n.title}</p>
+                                            <p class="text-[10px] text-gray-600 dark:text-gray-400 truncate">{n.message}</p>
+                                            <p class="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">{formatDate(n.createdAt)}</p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <div class="px-3 py-2 border-t border-gray-200/60 dark:border-gray-700/50">
+                            <a href="/notifications" class="text-[11px] font-medium text-primary-600 dark:text-primary-400 hover:underline">View all</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        )}
+
+        <!-- Navigation card at bottom (hidden when sidebar collapsed) -->
+        <section class="sidebar-nav-wrapper mt-auto px-2 pb-3" x-show="!collapsed" x-transition>
+            <div class="sidebar-card" x-data="{ open: true }">
+                <button type="button" @click="open = !open" class="sidebar-card-header w-full px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-gray-100/80 dark:hover:bg-gray-600/50 transition-colors">
+                    <h3 class="text-xs font-semibold text-gray-700 dark:text-gray-300">Navigation</h3>
+                    <svg class="size-3.5 text-gray-500 dark:text-gray-400 shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-gray-200/60 dark:border-gray-700/50">
+                    <nav class="sidebar-nav overflow-x-hidden px-2 py-3 space-y-0.5">
+            <a href="/" class="nav-link sidebar-nav-link group" title="Dashboard">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">Dashboard</span>
+            </a>
+            <a href="/users" class="nav-link sidebar-nav-link group" title="Users">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">Users</span>
+            </a>
+            <a href="/roles" class="nav-link sidebar-nav-link group" title="Roles">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">Roles</span>
+            </a>
+            <a href="/persons" class="nav-link sidebar-nav-link group" title="Persons">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">Persons</span>
+            </a>
+            <a href="/service-requests" class="nav-link sidebar-nav-link group" title="Service Requests">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h.01M9 16h.01"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">Service Requests</span>
+            </a>
+            <a href="/notifications" class="nav-link sidebar-nav-link group" title="Notifications">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">Notifications</span>
+            </a>
+            <a href="/faq" class="nav-link sidebar-nav-link group" title="FAQ">
+                <span class="sidebar-nav-icon">
+                    <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </span>
+                <span class="nav-label text-xs font-medium whitespace-nowrap overflow-hidden">FAQ</span>
+            </a>
+                    </nav>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </aside>
 
-<script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const sidebar = document.getElementById("sidebar");
-        const collapseButton = document.getElementById("collapse-button");
-        const mainContent = document.querySelector("main");
+<style>
+    /* When collapsed: hide cards and nav; header shows only the menu icon (link hidden via x-show) */
+    .sidebar[data-collapsed="true"] .sidebar-nav-wrapper {
+        display: none;
+    }
+    .sidebar[data-collapsed="true"] .sidebar-cards {
+        display: none;
+    }
+    /* When collapsed: center the menu icon in the header */
+    .sidebar[data-collapsed="true"] .sidebar-header {
+        justify-content: center;
+        border-bottom: none;
+    }
+</style>
 
-        if (!sidebar || !collapseButton || !mainContent) return;
-
-        // Check if there's a saved state in localStorage
-        const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
-
-        if (isCollapsed) {
-            sidebar.classList.add("-translate-x-full");
-        }
-
-        collapseButton.addEventListener("click", () => {
-            sidebar.classList.toggle("-translate-x-full");
-
-            // Save the state to localStorage
-            const isNowCollapsed =
-                sidebar.classList.contains("-translate-x-full");
-            localStorage.setItem("sidebarCollapsed", isNowCollapsed.toString());
-        });
-    });
+<script define:vars={{}}>
+    (function () {
+        const stored = typeof localStorage !== "undefined" && localStorage.getItem("sidebar-collapsed") === "true";
+        document.documentElement.style.setProperty("--sidebar-width", stored ? "3rem" : "13rem");
+        document.documentElement.style.setProperty("--sidebar-height", stored ? "3rem" : "auto");
+    })();
 </script>

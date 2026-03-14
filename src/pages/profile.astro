@@ -19,64 +19,146 @@ if (users.length === 0) {
 }
 
 const user = users[0];
+const darkModePreference = (user as { darkMode?: boolean }).darkMode ?? false;
 ---
 
 <Layout title="Profile">
-    <div class="min-h-screen bg-gray-100">
-        <div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-            <div class="px-4 py-6 sm:px-0">
-                <!-- Page Header -->
-                <div class="mb-6">
-                    <h1 class="text-3xl font-bold text-gray-900">Profile Settings</h1>
-                    <p class="mt-2 text-sm text-gray-600">
-                        Manage your account settings and preferences
-                    </p>
-                </div>
+    <div class="max-w-4xl mx-auto">
+        <!-- Page Header -->
+        <div class="mb-6">
+            <h1 class="page-title">Profile Settings</h1>
+            <p class="page-description">Manage your account settings and preferences</p>
+        </div>
 
-                <!-- Profile Information Card -->
-                <div class="bg-white shadow rounded-lg mb-6">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900">Profile Information</h2>
-                    </div>
-                    <div class="px-6 py-4">
-                        <dl class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <!-- Profile Information Card -->
+        <div class="card mb-6">
+            <div class="card-header">
+                <h2 class="card-header-title">Profile Information</h2>
+            </div>
+            <div class="card-body">
+                <dl class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Username</dt>
-                                <dd class="mt-1 text-sm text-gray-900" id="usernameDisplay">{user.username}</dd>
+                                <dt
+                                    class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    Username
+                                </dt>
+                                <dd
+                                    class="mt-1 text-sm text-gray-900 dark:text-gray-100"
+                                    id="usernameDisplay"
+                                >
+                                    {user.username}
+                                </dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Status</dt>
+                                <dt
+                                    class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    Status
+                                </dt>
                                 <dd class="mt-1 text-sm">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        {user.status || 'Active'}
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                    >
+                                        {user.status || "Active"}
                                     </span>
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Account Created</dt>
-                                <dd class="mt-1 text-sm text-gray-900">
-                                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                                <dt
+                                    class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    Account Created
+                                </dt>
+                                <dd
+                                    class="mt-1 text-sm text-gray-900 dark:text-gray-100"
+                                >
+                                    {
+                                        user.createdAt
+                                            ? new Date(
+                                                  user.createdAt,
+                                              ).toLocaleDateString()
+                                            : "N/A"
+                                    }
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Last Login</dt>
-                                <dd class="mt-1 text-sm text-gray-900">
-                                    {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                                <dt
+                                    class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                                >
+                                    Last Login
+                                </dt>
+                                <dd
+                                    class="mt-1 text-sm text-gray-900 dark:text-gray-100"
+                                >
+                                    {
+                                        user.lastLogin
+                                            ? new Date(
+                                                  user.lastLogin,
+                                              ).toLocaleDateString()
+                                            : "Never"
+                                    }
                                 </dd>
                             </div>
-                        </dl>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Preferences Card -->
+        <div class="card mb-6">
+            <div class="card-header">
+                <h2 class="card-header-title">Preferences</h2>
+            </div>
+            <div class="card-body">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3
+                                    class="text-sm font-medium text-gray-900 dark:text-gray-100"
+                                >
+                                    Dark mode
+                                </h3>
+                                <p
+                                    class="text-sm text-gray-500 dark:text-gray-400"
+                                >
+                                    Use dark theme across the application
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                id="darkModeToggle"
+                                role="switch"
+                                aria-checked={darkModePreference}
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                                class:list={{
+                                    "bg-primary-600": darkModePreference,
+                                    "bg-gray-200 dark:bg-gray-600":
+                                        !darkModePreference,
+                                }}
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                    class:list={{
+                                        "translate-x-5": darkModePreference,
+                                        "translate-x-1": !darkModePreference,
+                                    }}></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Edit Username Card -->
-                <div class="bg-white shadow rounded-lg mb-6">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900">Edit Username</h2>
-                    </div>
-                    <div class="px-6 py-4">
+        <!-- Edit Username Card -->
+        <div class="card mb-6">
+            <div class="card-header">
+                <h2 class="card-header-title">Edit Username</h2>
+            </div>
+            <div class="card-body">
                         <form id="usernameForm" class="space-y-4">
                             <!-- Error Message -->
-                            <div id="usernameError" class="hidden rounded-md bg-red-50 p-4">
+                            <div
+                                id="usernameError"
+                                class="hidden rounded-md bg-red-50 p-4"
+                            >
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <svg
@@ -87,18 +169,24 @@ const user = users[0];
                                             <path
                                                 fill-rule="evenodd"
                                                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                                clip-rule="evenodd"
-                                            ></path>
+                                                clip-rule="evenodd"></path>
                                         </svg>
                                     </div>
                                     <div class="ml-3">
-                                        <p id="usernameErrorText" class="text-sm font-medium text-red-800"></p>
+                                        <p
+                                            id="usernameErrorText"
+                                            class="text-sm font-medium text-red-800"
+                                        >
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Success Message -->
-                            <div id="usernameSuccess" class="hidden rounded-md bg-green-50 p-4">
+                            <div
+                                id="usernameSuccess"
+                                class="hidden rounded-md bg-green-50 p-4"
+                            >
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <svg
@@ -109,18 +197,24 @@ const user = users[0];
                                             <path
                                                 fill-rule="evenodd"
                                                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                clip-rule="evenodd"
-                                            ></path>
+                                                clip-rule="evenodd"></path>
                                         </svg>
                                     </div>
                                     <div class="ml-3">
-                                        <p class="text-sm font-medium text-green-800">Username updated successfully!</p>
+                                        <p
+                                            class="text-sm font-medium text-green-800"
+                                        >
+                                            Username updated successfully!
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <label for="username" class="block text-sm font-medium text-gray-700">
+                                <label
+                                    for="username"
+                                    class="block text-sm font-medium text-gray-700"
+                                >
                                     New Username
                                 </label>
                                 <input
@@ -130,7 +224,7 @@ const user = users[0];
                                     required
                                     minlength="3"
                                     value={user.username}
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
                                     placeholder="Enter new username"
                                 />
                             </div>
@@ -138,7 +232,7 @@ const user = users[0];
                                 <button
                                     type="submit"
                                     id="usernameSubmitBtn"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                                 >
                                     Update Username
                                 </button>
@@ -148,14 +242,23 @@ const user = users[0];
                 </div>
 
                 <!-- Change Password Card -->
-                <div class="bg-white shadow rounded-lg mb-6">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900">Change Password</h2>
+                <div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+                    <div
+                        class="px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                    >
+                        <h2
+                            class="text-xl font-semibold text-gray-900 dark:text-gray-100"
+                        >
+                            Change Password
+                        </h2>
                     </div>
                     <div class="px-6 py-4">
                         <form id="passwordForm" class="space-y-4">
                             <!-- Error Message -->
-                            <div id="passwordError" class="hidden rounded-md bg-red-50 p-4">
+                            <div
+                                id="passwordError"
+                                class="hidden rounded-md bg-red-50 p-4"
+                            >
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <svg
@@ -166,18 +269,24 @@ const user = users[0];
                                             <path
                                                 fill-rule="evenodd"
                                                 d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                                clip-rule="evenodd"
-                                            ></path>
+                                                clip-rule="evenodd"></path>
                                         </svg>
                                     </div>
                                     <div class="ml-3">
-                                        <p id="passwordErrorText" class="text-sm font-medium text-red-800"></p>
+                                        <p
+                                            id="passwordErrorText"
+                                            class="text-sm font-medium text-red-800"
+                                        >
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Success Message -->
-                            <div id="passwordSuccess" class="hidden rounded-md bg-green-50 p-4">
+                            <div
+                                id="passwordSuccess"
+                                class="hidden rounded-md bg-green-50 p-4"
+                            >
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <svg
@@ -188,18 +297,24 @@ const user = users[0];
                                             <path
                                                 fill-rule="evenodd"
                                                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                clip-rule="evenodd"
-                                            ></path>
+                                                clip-rule="evenodd"></path>
                                         </svg>
                                     </div>
                                     <div class="ml-3">
-                                        <p class="text-sm font-medium text-green-800">Password changed successfully!</p>
+                                        <p
+                                            class="text-sm font-medium text-green-800"
+                                        >
+                                            Password changed successfully!
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <label for="currentPassword" class="block text-sm font-medium text-gray-700">
+                                <label
+                                    for="currentPassword"
+                                    class="block text-sm font-medium text-gray-700"
+                                >
                                     Current Password
                                 </label>
                                 <input
@@ -207,12 +322,15 @@ const user = users[0];
                                     id="currentPassword"
                                     name="currentPassword"
                                     required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
                                     placeholder="Enter current password"
                                 />
                             </div>
                             <div>
-                                <label for="newPassword" class="block text-sm font-medium text-gray-700">
+                                <label
+                                    for="newPassword"
+                                    class="block text-sm font-medium text-gray-700"
+                                >
                                     New Password
                                 </label>
                                 <input
@@ -221,12 +339,15 @@ const user = users[0];
                                     name="newPassword"
                                     required
                                     minlength="6"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
                                     placeholder="Enter new password (min. 6 characters)"
                                 />
                             </div>
                             <div>
-                                <label for="confirmPassword" class="block text-sm font-medium text-gray-700">
+                                <label
+                                    for="confirmPassword"
+                                    class="block text-sm font-medium text-gray-700"
+                                >
                                     Confirm New Password
                                 </label>
                                 <input
@@ -235,7 +356,7 @@ const user = users[0];
                                     name="confirmPassword"
                                     required
                                     minlength="6"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
                                     placeholder="Confirm new password"
                                 />
                             </div>
@@ -243,7 +364,7 @@ const user = users[0];
                                 <button
                                     type="submit"
                                     id="passwordSubmitBtn"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                                 >
                                     Change Password
                                 </button>
@@ -253,22 +374,32 @@ const user = users[0];
                 </div>
 
                 <!-- Linked Person Information Card (if available) -->
-                <div id="personCard" class="bg-white shadow rounded-lg hidden">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900">Personal Information</h2>
+                <div
+                    id="personCard"
+                    class="bg-white dark:bg-gray-800 shadow rounded-lg hidden"
+                >
+                    <div
+                        class="px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                    >
+                        <h2
+                            class="text-xl font-semibold text-gray-900 dark:text-gray-100"
+                        >
+                            Personal Information
+                        </h2>
                     </div>
                     <div class="px-6 py-4">
-                        <dl class="grid grid-cols-1 gap-6 sm:grid-cols-2" id="personInfo">
+                        <dl
+                            class="grid grid-cols-1 gap-6 sm:grid-cols-2"
+                            id="personInfo"
+                        >
                             <!-- Person info will be populated by JavaScript -->
                         </dl>
                     </div>
                 </div>
-            </div>
-        </div>
     </div>
 </Layout>
 
-<script define:vars={{ userId }}>
+<script define:vars={{ userId, darkModePreference }} lang="ts">
     import { actions } from "astro:actions";
     import { navigate } from "astro:transitions/client";
     const usernameForm = document.getElementById("usernameForm");
@@ -291,17 +422,22 @@ const user = users[0];
                 console.error("Error loading profile:", error);
                 return;
             }
-            
+
             if (data?.success && data.data) {
+                // Sync dark mode from server
+                if (typeof data.data.user.darkMode === "boolean") {
+                    isDarkMode = data.data.user.darkMode;
+                    updateDarkModeUI(document.getElementById("darkModeToggle"));
+                }
                 // Update username display if changed
                 if (data.data.user.username && usernameDisplay) {
                     usernameDisplay.textContent = data.data.user.username;
-                    const usernameInput = document.getElementById("username") as HTMLInputElement;
-                    if (usernameInput) {
+                    const usernameInput = document.getElementById("username");
+                    if (usernameInput instanceof HTMLInputElement) {
                         usernameInput.value = data.data.user.username;
                     }
                 }
-                
+
                 // Display person information if available
                 if (data.data.person) {
                     const personCard = document.getElementById("personCard");
@@ -315,39 +451,39 @@ const user = users[0];
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Email</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.email || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.email || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Phone</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.phone || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.phone || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Gender</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.gender || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.gender || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.dateOfBirth ? new Date(person.dateOfBirth).toLocaleDateString() : 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.dateOfBirth ? new Date(person.dateOfBirth).toLocaleDateString() : "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Address</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.address || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.address || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">City</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.city || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.city || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">State</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.state || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.state || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Zip Code</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.zipCode || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.zipCode || "N/A"}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Country</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${person.country || 'N/A'}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">${person.country || "N/A"}</dd>
                             </div>
                         `;
                         personCard.classList.remove("hidden");
@@ -380,7 +516,8 @@ const user = users[0];
 
         if (!username || username.length < 3) {
             if (usernameError && usernameErrorText) {
-                usernameErrorText.textContent = "Username must be at least 3 characters long";
+                usernameErrorText.textContent =
+                    "Username must be at least 3 characters long";
                 usernameError.classList.remove("hidden");
             }
             if (usernameSubmitBtn) {
@@ -398,7 +535,8 @@ const user = users[0];
 
             if (error) {
                 if (usernameError && usernameErrorText) {
-                    usernameErrorText.textContent = error.message || "An error occurred";
+                    usernameErrorText.textContent =
+                        error.message || "An error occurred";
                     usernameError.classList.remove("hidden");
                 }
             } else if (data?.success) {
@@ -410,7 +548,8 @@ const user = users[0];
                 }, 3000);
             } else {
                 if (usernameError && usernameErrorText) {
-                    usernameErrorText.textContent = data?.error || "An error occurred";
+                    usernameErrorText.textContent =
+                        data?.error || "An error occurred";
                     usernameError.classList.remove("hidden");
                 }
             }
@@ -453,7 +592,8 @@ const user = users[0];
 
         if (newPassword.length < 6) {
             if (passwordError && passwordErrorText) {
-                passwordErrorText.textContent = "Password must be at least 6 characters long";
+                passwordErrorText.textContent =
+                    "Password must be at least 6 characters long";
                 passwordError.classList.remove("hidden");
             }
             return;
@@ -474,7 +614,8 @@ const user = users[0];
 
             if (error) {
                 if (passwordError && passwordErrorText) {
-                    passwordErrorText.textContent = error.message || "An error occurred";
+                    passwordErrorText.textContent =
+                        error.message || "An error occurred";
                     passwordError.classList.remove("hidden");
                 }
             } else if (data?.success) {
@@ -487,7 +628,8 @@ const user = users[0];
                 }, 3000);
             } else {
                 if (passwordError && passwordErrorText) {
-                    passwordErrorText.textContent = data?.error || "An error occurred";
+                    passwordErrorText.textContent =
+                        data?.error || "An error occurred";
                     passwordError.classList.remove("hidden");
                 }
             }
@@ -503,6 +645,61 @@ const user = users[0];
             }
         }
     });
+
+    // Dark mode toggle — init on astro:page-load and DOMContentLoaded so the toggle exists (view transitions)
+    let isDarkMode = darkModePreference;
+
+    function updateDarkModeUI(toggleEl) {
+        const thumb = toggleEl?.querySelector("span");
+        if (toggleEl && thumb) {
+            toggleEl.setAttribute("aria-checked", String(isDarkMode));
+            toggleEl.classList.toggle("bg-primary-600", isDarkMode);
+            toggleEl.classList.toggle("bg-gray-200", !isDarkMode);
+            toggleEl.classList.toggle("dark:bg-gray-600", !isDarkMode);
+            thumb.classList.toggle("translate-x-5", isDarkMode);
+            thumb.classList.toggle("translate-x-1", !isDarkMode);
+        }
+        document.documentElement.classList.toggle("dark", isDarkMode);
+    }
+
+    function initDarkMode() {
+        isDarkMode = darkModePreference;
+        const darkModeToggle = document.getElementById("darkModeToggle");
+        if (!darkModeToggle) return;
+        updateDarkModeUI(darkModeToggle);
+
+        if (darkModeToggle.dataset.darkModeInited) return;
+        darkModeToggle.dataset.darkModeInited = "true";
+
+        darkModeToggle.addEventListener("click", async () => {
+            isDarkMode = !isDarkMode;
+            updateDarkModeUI(darkModeToggle);
+            document.cookie = `theme=${isDarkMode ? "dark" : "light"}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Strict`;
+
+            try {
+                const { data, error } = await actions.updateProfile({
+                    userId,
+                    darkMode: isDarkMode,
+                });
+                if (error || !data?.success) {
+                    isDarkMode = !isDarkMode;
+                    updateDarkModeUI(darkModeToggle);
+                    document.cookie = `theme=${isDarkMode ? "dark" : "light"}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Strict`;
+                }
+            } catch {
+                isDarkMode = !isDarkMode;
+                updateDarkModeUI(darkModeToggle);
+                document.cookie = `theme=${isDarkMode ? "dark" : "light"}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Strict`;
+            }
+        });
+    }
+
+    document.addEventListener("astro:page-load", initDarkMode);
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initDarkMode);
+    } else {
+        initDarkMode();
+    }
 
     // Load profile on page load
     loadProfile();

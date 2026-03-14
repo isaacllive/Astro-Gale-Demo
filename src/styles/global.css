@@ -1,1 +1,223 @@
 @import "tailwindcss";
+
+/* Primary brand colors – Tailwind v4 requires @theme for custom colors in @apply */
+@theme {
+	/* Softer, light-first primary palette (sky-inspired) */
+	--color-primary-50: #f0f9ff;
+	--color-primary-100: #e0f2fe;
+	--color-primary-200: #bae6fd;
+	--color-primary-300: #7dd3fc;
+	--color-primary-400: #38bdf8;
+	--color-primary-500: #0ea5e9;
+	--color-primary-600: #0284c7;
+	--color-primary-700: #0369a1;
+	--color-primary-800: #075985;
+	--color-primary-900: #0c4a6e;
+	--color-primary-950: #082f49;
+}
+
+/* ==========================================================================
+   Shared component styles – use these for consistent UI across pages
+   ========================================================================== */
+
+/* App shell & layout surfaces */
+.app-shell {
+	@apply min-h-screen bg-white;
+}
+
+.app-header {
+	@apply bg-primary-600 text-white shadow-sm;
+}
+
+.dark .app-header {
+	@apply bg-primary-800 text-white;
+}
+
+/* Sidebar surfaces – slightly stronger border for contrast on light backgrounds */
+.sidebar-card {
+	@apply rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm;
+}
+
+.sidebar-nav-link {
+	@apply flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-600 hover:bg-primary-50 hover:text-primary-700 transition-colors;
+}
+
+.sidebar-nav-icon {
+	@apply flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 group-hover:bg-primary-100 group-hover:text-primary-600 transition-colors;
+}
+
+/* Right sidebar surface */
+.right-sidebar-shell {
+	@apply shrink-0 w-52 xl:w-64 self-start my-4 rounded-2xl bg-white text-gray-900 shadow-lg ring-1 ring-black/5 border border-gray-200/60;
+}
+
+/* Page structure */
+.page-title {
+	@apply text-3xl font-bold text-gray-900;
+}
+
+.page-description {
+	@apply mt-2 text-sm text-gray-600;
+}
+
+.section-title {
+	@apply text-xl font-semibold text-gray-800;
+}
+
+/* Cards – content panels (lists, metrics, sections); clear border for contrast on gray-50 main */
+.card {
+	@apply overflow-hidden rounded-xl bg-white text-gray-900 shadow-md ring-1 ring-black/5 border border-gray-200;
+}
+
+.card-flat {
+	@apply overflow-hidden rounded-lg bg-white shadow border border-gray-200;
+}
+
+.card-header {
+	@apply px-4 py-3 border-b border-gray-200;
+}
+
+.card-header-title {
+	@apply text-lg font-semibold text-gray-900 sm:text-xl;
+}
+
+.card-body {
+	@apply px-4 py-3;
+}
+
+/* Metric / stat cards (dashboard tiles) */
+.metric-card {
+	@apply overflow-hidden rounded-xl bg-white text-gray-900 shadow-md ring-1 ring-black/5 border border-gray-200 transition-all duration-200 hover:shadow-lg;
+}
+
+.metric-card-inner {
+	@apply p-4;
+}
+
+.metric-label {
+	@apply text-sm font-medium text-gray-500 truncate;
+}
+
+.metric-value {
+	@apply text-lg font-semibold text-gray-900;
+}
+
+/* Buttons */
+.btn {
+	@apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+}
+
+.btn-primary {
+	@apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 bg-primary-600 text-white hover:bg-primary-700;
+}
+
+.btn-secondary {
+	@apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 bg-gray-100 text-gray-800 hover:bg-gray-200;
+}
+
+.btn-danger {
+	@apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 bg-red-600 text-white hover:bg-red-700;
+}
+
+.btn-ghost {
+	@apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 bg-transparent text-gray-600 hover:bg-gray-100;
+}
+
+.btn-sm {
+	@apply px-3 py-1.5 text-xs;
+}
+
+.btn-icon {
+	@apply p-2;
+}
+
+/* Form controls */
+.form-label {
+	@apply block text-sm font-medium text-gray-700;
+}
+
+.form-input {
+	@apply mt-1 block w-full rounded-lg border border-gray-200 bg-white text-gray-900 shadow-sm focus:border-primary-500 focus:ring-primary-500;
+}
+
+.form-select {
+	@apply mt-1 block w-full rounded-lg border border-gray-200 bg-white text-gray-900 shadow-sm focus:border-primary-500 focus:ring-primary-500;
+}
+
+/* Modals – .hidden must override .modal-overlay’s flex (Tailwind v4 display order) */
+.modal-overlay {
+	@apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-200/40 backdrop-blur-sm p-4;
+}
+
+.modal-overlay.hidden {
+	display: none !important;
+}
+
+.modal-panel {
+	@apply relative mt-12 sm:mt-20 w-full max-w-md rounded-xl bg-white shadow-xl ring-1 ring-black/5 border border-gray-200 p-6;
+}
+
+.modal-title {
+	@apply text-lg font-semibold text-gray-900 mb-4;
+}
+
+/* Empty state */
+.empty-state-container {
+	@apply flex flex-col items-center justify-center gap-2 py-12 text-center text-gray-500;
+}
+
+.empty-state-icon {
+	@apply h-12 w-12;
+}
+
+.empty-state-title {
+	@apply text-sm font-medium text-gray-900;
+}
+
+/* Data table pagination (used by DataTable.astro) */
+.pagination-btn {
+	@apply inline-flex items-center justify-center min-w-[2.25rem] px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors;
+}
+
+.pagination-btn-active {
+	@apply bg-primary-600 text-white border-primary-600 hover:bg-primary-700;
+}
+
+/* Table cell typography (DataTable.astro) */
+.data-table-th {
+	@apply text-left text-xs font-medium uppercase tracking-wider text-gray-500;
+}
+
+.data-table-td {
+	@apply px-3 sm:px-4 py-2.5 text-sm text-gray-900 whitespace-nowrap;
+}
+
+/* Styled scrollbars – WebKit (Chrome, Safari, Edge) */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: theme("colors.gray.300") transparent;
+}
+
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+	background-color: theme("colors.gray.300");
+	border-radius: 4px;
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background-color: theme("colors.gray.400");
+}
+
+*::-webkit-scrollbar-thumb:active {
+	background-color: theme("colors.gray.500");
+}

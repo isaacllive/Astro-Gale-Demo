@@ -140,17 +140,8 @@ const actions = [
 ---
 
 <Layout title="Catalogs">
-    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="px-4 py-6 sm:px-0">
-            <div class="mb-6">
-                <button
-                    id="addCatalogBtn"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                    Add Catalog Entry
-                </button>
-            </div>
-            <DataTable
+    <button id="addCatalogBtn" class="hidden" type="button" aria-hidden="true">Add</button>
+    <DataTable
                 title="Catalogs"
                 description="Manage system catalogs and their values"
                 data={response.data}
@@ -166,9 +157,9 @@ const actions = [
                 showSearch={true}
                 showExport={true}
                 showColumnToggle={true}
+                addNewOnClick="openAddCatalogModal"
+                addNewLabel="Add catalog entry"
             />
-        </div>
-    </div>
 
     <!-- Add/Edit Modal -->
     <div
@@ -198,7 +189,7 @@ const actions = [
                             id="catalogType"
                             name="type"
                             required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                         >
                             <option value="">Select a type</option>
                             {
@@ -222,7 +213,7 @@ const actions = [
                             id="catalogKey"
                             name="key"
                             required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                             placeholder="e.g., ACTIVE"
                         />
                     </div>
@@ -238,7 +229,7 @@ const actions = [
                             id="catalogValue"
                             name="value"
                             required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                             placeholder="e.g., Active"
                         />
                     </div>
@@ -252,7 +243,7 @@ const actions = [
                         </button>
                         <button
                             type="submit"
-                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                            class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
                         >
                             Save
                         </button>
@@ -283,7 +274,7 @@ const actions = [
         "catalogValue",
     ) as HTMLInputElement;
 
-    // Add button
+    // Add button (hidden; triggered by DataTable "Add new" action)
     document.getElementById("addCatalogBtn")?.addEventListener("click", () => {
         if (
             modal &&
@@ -302,6 +293,7 @@ const actions = [
             modal.classList.remove("hidden");
         }
     });
+    (window as any).openAddCatalogModal = () => document.getElementById("addCatalogBtn")?.click();
 
     // Edit function - called from DataTable actions
     (window as any).editCatalog = async (id: number) => {

@@ -22,6 +22,7 @@ export const OBJECT_TYPES = {
 	ASSIGNMENT: { type: CATALOGS.OBJECT_TYPE, key: 'ASSIGNMENT', value: 'Assignment' },
 	FILE: { type: CATALOGS.OBJECT_TYPE, key: 'FILE', value: 'File' },
 	CATALOG: { type: CATALOGS.OBJECT_TYPE, key: 'CATALOG', value: 'Catalog' },
+	ROLE: { type: CATALOGS.OBJECT_TYPE, key: 'ROLE', value: 'Role' },
 } as const;
 
 // Status Values

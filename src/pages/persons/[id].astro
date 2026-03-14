@@ -1,0 +1,219 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { db, Person } from "astro:db";
+import { eq } from "astro:db";
+
+const { cookies, redirect, params } = Astro;
+
+// Check authentication
+const userId = cookies.get("user-id");
+if (!userId) {
+    return redirect("/login?error=Please login to view person details");
+}
+
+const id = parseInt(params?.id ?? "");
+if (isNaN(id)) {
+    return redirect("/persons?error=Invalid person ID");
+}
+
+const persons = await db.select().from(Person).where(eq(Person.id, id));
+if (persons.length === 0) {
+    return redirect("/persons?error=Person not found");
+}
+
+const person = persons[0];
+---
+
+<Layout title={`${person.firstName} ${person.lastName}`}>
+    <div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <a
+                        href="/persons"
+                        class="text-sm text-primary-600 hover:text-primary-800 mb-2 inline-block"
+                    >
+                        ← Back to Persons
+                    </a>
+                    <h1 class="text-3xl font-bold text-gray-900">
+                        {person.firstName}
+                        {person.lastName}
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Person #{person.id}
+                    </p>
+                </div>
+                <a
+                    href={`/persons/${person.id}/edit`}
+                    class="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 transition"
+                >
+                    Edit
+                </a>
+            </div>
+
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">
+                        Personal Information
+                    </h2>
+                </div>
+                <dl class="px-6 py-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">
+                            First Name
+                        </dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {person.firstName || "—"}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">
+                            Last Name
+                        </dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {person.lastName || "—"}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        <dd class="mt-1 text-sm">
+                            {
+                                person.email ? (
+                                    <a
+                                        href={`mailto:${person.email}`}
+                                        class="text-primary-600 hover:text-primary-800"
+                                    >
+                                        {person.email}
+                                    </a>
+                                ) : (
+                                    "—"
+                                )
+                            }
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {person.phone || "—"}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">
+                            Date of Birth
+                        </dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {
+                                person.dateOfBirth
+                                    ? new Date(
+                                          person.dateOfBirth,
+                                      ).toLocaleDateString()
+                                    : "—"
+                            }
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">
+                            Gender
+                        </dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {person.gender || "—"}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">
+                            Status
+                        </dt>
+                        <dd class="mt-1 text-sm">
+                            <span
+                                class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    person.status === "active" ||
+                                    person.status === "Active"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-gray-100 text-gray-800"
+                                }`}
+                            >
+                                {person.status || "—"}
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+
+                <div class="px-6 py-4 border-t border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                        Address
+                    </h2>
+                    <dl class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <dt class="text-sm font-medium text-gray-500">
+                                Street Address
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {person.address || "—"}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">
+                                City
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {person.city || "—"}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">
+                                State
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {person.state || "—"}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">
+                                ZIP Code
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {person.zipCode || "—"}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">
+                                Country
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {person.country || "—"}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">
+                                Created
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {
+                                    person.createdAt
+                                        ? new Date(
+                                              person.createdAt,
+                                          ).toLocaleDateString()
+                                        : "—"
+                                }
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">
+                                Last Updated
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {
+                                    person.updatedAt
+                                        ? new Date(
+                                              person.updatedAt,
+                                          ).toLocaleDateString()
+                                        : "—"
+                                }
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</Layout>

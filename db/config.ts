@@ -14,6 +14,7 @@ const User = defineTable({
     username: column.text({ unique: true }),
     password: column.text(),
     lastLogin: column.date({ optional: true }),
+    darkMode: column.boolean({ default: false, optional: true }),
     ...sharedColumns
   }
 });
@@ -139,8 +140,31 @@ const PermissionAssigned = defineTable({
   }
 });
 
+const Role = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    name: column.text({ unique: true }),
+    description: column.text({ optional: true }),
+    ...sharedColumns
+  }
+});
+
+const ServiceRequest = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    title: column.text(),
+    description: column.text({ optional: true }),
+    type: column.text({ optional: true }), // e.g. support, maintenance, general
+    priority: column.text({ optional: true }), // low, medium, high, urgent
+    requesterId: column.number(), // FK -> Person
+    assignedToId: column.number({ optional: true }), // FK -> User
+    dueDate: column.date({ optional: true }),
+    ...sharedColumns
+  }
+});
+
 // https://astro.build/db/config
 export default defineDb({
-  tables: { User, Person, Catalog, Assignment, Permision, File, FileContent, Notification, PermissionDef, PermissionAssigned }
+  tables: { User, Person, Catalog, Assignment, Permision, File, FileContent, Notification, PermissionDef, PermissionAssigned, Role, ServiceRequest }
 });
 

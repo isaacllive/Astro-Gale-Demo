@@ -1,8 +1,8 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { db, Notification, eq, and, desc, or, ne } from "astro:db";
+import { db, Notification, eq, and, desc, or, ne, sql } from "astro:db";
 
-const { cookies, redirect } = Astro;
+const { cookies, redirect, url } = Astro;
 
 // Check authentication
 const userIdCookie = cookies.get("user-id");
@@ -12,23 +12,46 @@ if (!userIdCookie?.value) {
 
 const userId = parseInt(userIdCookie.value);
 
-// Fetch notifications (only active ones)
-const notifications = await db.select()
-    .from(Notification)
-    .where(
-        and(
-            eq(Notification.userId, userId),
-            or(eq(Notification.status, 'Active'), ne(Notification.status, 'deleted'))
-        )
-    )
-    .orderBy(desc(Notification.createdAt))
-    .limit(50);
+// Pagination
+const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+const pageSize = Math.min(
+    50,
+    Math.max(10, parseInt(url.searchParams.get("pageSize") || "20", 10)),
+);
+const offset = (page - 1) * pageSize;
 
-const unreadCount = notifications.filter(n => !n.isRead).length;
+const baseCondition = and(
+    eq(Notification.userId, userId),
+    or(eq(Notification.status, "Active"), ne(Notification.status, "deleted")),
+);
+
+// Get total count
+const [{ count: totalCount }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(Notification)
+    .where(baseCondition);
+
+const totalPages = Math.ceil(totalCount / pageSize);
+
+// Fetch notifications with pagination
+const notifications = await db
+    .select()
+    .from(Notification)
+    .where(baseCondition)
+    .orderBy(desc(Notification.createdAt))
+    .limit(pageSize)
+    .offset(offset);
+
+// Total unread count (across all pages)
+const unreadNotifications = await db
+    .select()
+    .from(Notification)
+    .where(and(baseCondition, eq(Notification.isRead, false)));
+const unreadCount = unreadNotifications.length;
 
 // Helper function to format date
 function formatDate(date: Date | null) {
-    if (!date) return 'N/A';
+    if (!date) return "N/A";
     const d = new Date(date);
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
@@ -36,135 +59,167 @@ function formatDate(date: Date | null) {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60)
+        return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+    if (diffHours < 24)
+        return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
     return d.toLocaleDateString();
 }
 
 // Helper function to get type color
 function getTypeColor(type: string | null) {
     switch (type) {
-        case 'success': return 'bg-green-100 text-green-800 border-green-200';
-        case 'warning': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'error': return 'bg-red-100 text-red-800 border-red-200';
-        default: return 'bg-blue-100 text-blue-800 border-blue-200';
+        case "success":
+            return "bg-green-100 text-green-800 border-green-200";
+        case "warning":
+            return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        case "error":
+            return "bg-red-100 text-red-800 border-red-200";
+        default:
+            return "bg-blue-100 text-blue-800 border-blue-200";
     }
 }
 ---
 
 <Layout title="Notifications">
-    <div class="min-h-screen bg-gray-100">
-        <div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-            <div class="px-4 py-6 sm:px-0">
-                <!-- Page Header -->
-                <div class="mb-6 flex items-center justify-between">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-900">Notifications</h1>
-                        <p class="mt-2 text-sm text-gray-600">
-                            {unreadCount > 0 ? (
-                                <span>You have {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}</span>
-                            ) : (
-                                <span>All caught up! No unread notifications.</span>
-                            )}
-                        </p>
-                    </div>
-                    {unreadCount > 0 && (
-                        <button
-                            id="markAllReadBtn"
-                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
-                        >
-                            Mark all as read
-                        </button>
-                    )}
-                </div>
-
-                <!-- Notifications List -->
-                <div class="bg-white shadow rounded-lg overflow-hidden">
-                    {notifications.length === 0 ? (
-                        <div class="p-12 text-center">
-                            <svg
-                                class="mx-auto h-12 w-12 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                                ></path>
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No notifications</h3>
-                            <p class="mt-1 text-sm text-gray-500">You're all caught up!</p>
-                        </div>
+    <div class="max-w-4xl mx-auto">
+        <!-- Page Header -->
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 class="page-title">Notifications</h1>
+                <p class="page-description">
+                    {unreadCount > 0 ? (
+                        <span>You have {unreadCount} unread notification{unreadCount > 1 ? "s" : ""}</span>
                     ) : (
-                        <ul class="divide-y divide-gray-200">
-                            {notifications.map((notification) => (
-                                <li
-                                    class={`p-4 hover:bg-gray-50 transition-colors ${
-                                        !notification.isRead ? 'bg-blue-50' : ''
-                                    }`}
-                                    data-notification-id={notification.id}
-                                >
-                                    <div class="flex items-start">
-                                        <div class="flex-shrink-0">
-                                            {!notification.isRead && (
-                                                <div class="h-2 w-2 bg-indigo-600 rounded-full mt-2"></div>
-                                            )}
-                                        </div>
-                                        <div class="ml-3 flex-1">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center space-x-2">
-                                                    <p class={`text-sm font-medium ${
-                                                        !notification.isRead ? 'text-gray-900' : 'text-gray-700'
-                                                    }`}>
-                                                        {notification.title}
-                                                    </p>
-                                                    {notification.type && (
-                                                        <span class={`px-2 py-0.5 text-xs font-medium rounded border ${getTypeColor(notification.type)}`}>
-                                                            {notification.type}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div class="flex items-center space-x-2">
-                                                    <span class="text-xs text-gray-500">
-                                                        {formatDate(notification.createdAt)}
-                                                    </span>
-                                                    {!notification.isRead && (
-                                                        <button
-                                                            class="text-xs text-indigo-600 hover:text-indigo-800"
-                                                            data-mark-read={notification.id}
-                                                        >
-                                                            Mark as read
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <p class={`mt-1 text-sm ${
-                                                !notification.isRead ? 'text-gray-900' : 'text-gray-600'
-                                            }`}>
-                                                {notification.message}
-                                            </p>
-                                            {notification.link && (
-                                                <a
-                                                    href={notification.link}
-                                                    class="mt-2 inline-block text-sm text-indigo-600 hover:text-indigo-800"
-                                                >
-                                                    View details →
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
+                        <span>All caught up! No unread notifications.</span>
                     )}
-                </div>
+                </p>
             </div>
+            {unreadCount > 0 && (
+                <button id="markAllReadBtn" type="button" class="btn-primary btn-sm">
+                    Mark all as read
+                </button>
+            )}
         </div>
+
+        <!-- Notifications List -->
+        <div class="card overflow-hidden">
+            {notifications.length === 0 ? (
+                <div class="empty-state-container">
+                    <svg class="empty-state-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <h3 class="empty-state-title">No notifications</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">You're all caught up!</p>
+                </div>
+            ) : (
+                <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {notifications.map((notification) => (
+                        <li
+                            class={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${!notification.isRead ? "bg-primary-50/50 dark:bg-primary-900/20" : ""}`}
+                            data-notification-id={notification.id}
+                        >
+                                        <div class="flex items-start">
+                                            <div class="flex-shrink-0">
+                                                {!notification.isRead && (
+                                                    <div class="h-2 w-2 bg-primary-600 rounded-full mt-2" />
+                                                )}
+                                            </div>
+                                            <div class="ml-3 flex-1">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center space-x-2">
+                                                        <p class={`text-sm font-medium ${!notification.isRead ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"}`}>
+                                                            {notification.title}
+                                                        </p>
+                                                        {notification.type && (
+                                                            <span class={`px-2 py-0.5 text-xs font-medium rounded border ${getTypeColor(notification.type)}`}>
+                                                                {notification.type}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                            {formatDate(notification.createdAt)}
+                                                        </span>
+                                                        {!notification.isRead && (
+                                                            <button type="button" class="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300" data-mark-read={notification.id}>
+                                                                Mark as read
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <p
+                                                    class={`mt-1 text-sm ${
+                                                        !notification.isRead
+                                                            ? "text-gray-900"
+                                                            : "text-gray-600"
+                                                    }`}
+                                                >
+                                                    {notification.message}
+                                                </p>
+                                                {notification.link && (
+                                                    <a
+                                                        href={notification.link}
+                                                        class="mt-2 inline-block text-sm text-primary-600 hover:text-primary-800"
+                                                    >
+                                                        View details →
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )
+                    }
+                    {
+                        totalPages > 1 && (
+                            <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
+                                <p class="text-sm text-gray-600">
+                                    Showing{" "}
+                                    <span class="font-medium">
+                                        {(page - 1) * pageSize + 1}
+                                    </span>{" "}
+                                    to{" "}
+                                    <span class="font-medium">
+                                        {Math.min(page * pageSize, totalCount)}
+                                    </span>{" "}
+                                    of{" "}
+                                    <span class="font-medium">
+                                        {totalCount}
+                                    </span>{" "}
+                                    notifications
+                                </p>
+                                <div class="flex gap-2">
+                                    <a
+                                        href={`/notifications?page=${page - 1}&pageSize=${pageSize}`}
+                                        class={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                                            page <= 1
+                                                ? "bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none"
+                                                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+                                        }`}
+                                        aria-disabled={page <= 1}
+                                    >
+                                        Previous
+                                    </a>
+                                    <a
+                                        href={`/notifications?page=${page + 1}&pageSize=${pageSize}`}
+                                        class={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                                            page >= totalPages
+                                                ? "bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none"
+                                                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+                                        }`}
+                                        aria-disabled={page >= totalPages}
+                                    >
+                                        Next
+                                    </a>
+                                </div>
+                            </div>
+                        )
+                    }
+                </div>
     </div>
 </Layout>
 
@@ -177,10 +232,12 @@ function getTypeColor(type: string | null) {
         const markAllReadBtn = document.getElementById("markAllReadBtn");
         if (markAllReadBtn) {
             markAllReadBtn.addEventListener("click", async () => {
-                const userId = parseInt(document.cookie
-                    .split('; ')
-                    .find(row => row.startsWith('user-id='))
-                    ?.split('=')[1] || '0');
+                const userId = parseInt(
+                    document.cookie
+                        .split("; ")
+                        .find((row) => row.startsWith("user-id="))
+                        ?.split("=")[1] || "0",
+                );
 
                 if (!userId) return;
 
@@ -192,17 +249,25 @@ function getTypeColor(type: string | null) {
         }
 
         // Mark individual notification as read
-        document.querySelectorAll('[data-mark-read]').forEach((btn) => {
+        document.querySelectorAll("[data-mark-read]").forEach((btn) => {
             btn.addEventListener("click", async (e) => {
-                const notificationId = parseInt((e.target as HTMLElement).getAttribute('data-mark-read') || '0');
-                const userId = parseInt(document.cookie
-                    .split('; ')
-                    .find(row => row.startsWith('user-id='))
-                    ?.split('=')[1] || '0');
+                const notificationId = parseInt(
+                    (e.target as HTMLElement).getAttribute("data-mark-read") ||
+                        "0",
+                );
+                const userId = parseInt(
+                    document.cookie
+                        .split("; ")
+                        .find((row) => row.startsWith("user-id="))
+                        ?.split("=")[1] || "0",
+                );
 
                 if (!notificationId || !userId) return;
 
-                const { data, error } = await actions.markAsRead({ notificationId, userId });
+                const { data, error } = await actions.markAsRead({
+                    notificationId,
+                    userId,
+                });
                 if (data?.success) {
                     navigate(window.location.pathname);
                 }
@@ -210,27 +275,38 @@ function getTypeColor(type: string | null) {
         });
 
         // Click on notification to mark as read
-        document.querySelectorAll('[data-notification-id]').forEach((item) => {
+        document.querySelectorAll("[data-notification-id]").forEach((item) => {
             item.addEventListener("click", async (e) => {
                 // Don't mark as read if clicking on a link or button
-                if ((e.target as HTMLElement).tagName === 'A' || 
-                    (e.target as HTMLElement).tagName === 'BUTTON') {
+                if (
+                    (e.target as HTMLElement).tagName === "A" ||
+                    (e.target as HTMLElement).tagName === "BUTTON"
+                ) {
                     return;
                 }
 
-                const notificationId = parseInt((item as HTMLElement).getAttribute('data-notification-id') || '0');
-                const userId = parseInt(document.cookie
-                    .split('; ')
-                    .find(row => row.startsWith('user-id='))
-                    ?.split('=')[1] || '0');
+                const notificationId = parseInt(
+                    (item as HTMLElement).getAttribute(
+                        "data-notification-id",
+                    ) || "0",
+                );
+                const userId = parseInt(
+                    document.cookie
+                        .split("; ")
+                        .find((row) => row.startsWith("user-id="))
+                        ?.split("=")[1] || "0",
+                );
 
                 if (!notificationId || !userId) return;
 
                 const notification = item as HTMLElement;
-                const isRead = !notification.classList.contains('bg-blue-50');
+                const isRead = !notification.classList.contains("bg-blue-50");
 
                 if (!isRead) {
-                    const { data, error } = await actions.markAsRead({ notificationId, userId });
+                    const { data, error } = await actions.markAsRead({
+                        notificationId,
+                        userId,
+                    });
                     if (data?.success) {
                         navigate(window.location.pathname);
                     }

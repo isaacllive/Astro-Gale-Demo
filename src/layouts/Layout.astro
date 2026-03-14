@@ -1,10 +1,81 @@
 ---
 import "../styles/global.css";
+import { ViewTransitions } from "astro:transitions";
 import Header from "../components/Header.astro";
+import Sidebar from "../components/Sidebar.astro";
+import RightSidebar from "../components/RightSidebar.astro";
+import Breadcrumb from "../components/Breadcrumb.astro";
+
+const { cookies, url } = Astro;
+const userIdCookie = cookies.get("user-id");
+const isLoggedIn = !!userIdCookie?.value;
+
+// Optional override from page (e.g. <Layout breadcrumbs={[...]} />)
+interface BreadcrumbItem {
+	label: string;
+	href?: string;
+}
+interface LayoutProps {
+	breadcrumbs?: BreadcrumbItem[];
+	/** When true, show the right sidebar when logged in. Default false (hidden) for now. */
+	rightSidebar?: boolean;
+}
+const { breadcrumbs: breadcrumbsOverride = undefined, rightSidebar: rightSidebarVisible = false } = Astro.props as LayoutProps;
+
+function getBreadcrumbs(): BreadcrumbItem[] {
+	if (breadcrumbsOverride && breadcrumbsOverride.length > 0) return breadcrumbsOverride;
+
+	const pathname = url.pathname.replace(/\/$/, "") || "/";
+	const segments = pathname === "/" ? [] : pathname.slice(1).split("/");
+
+	const segmentLabels: Record<string, string> = {
+		dashboard: "Dashboard",
+		users: "Users",
+		roles: "Roles",
+		permissions: "Permissions",
+		persons: "Persons",
+		notifications: "Notifications",
+		catalogs: "Catalogs",
+		profile: "Profile",
+		faq: "FAQ",
+		"service-requests": "Service Requests",
+		about: "About",
+		contact: "Contact",
+		login: "Login",
+		register: "Register",
+		new: "New",
+		edit: "Edit",
+	};
+
+	const items: BreadcrumbItem[] = [];
+	let href = "";
+
+	for (let i = 0; i < segments.length; i++) {
+		const segment = segments[i];
+		const isNumeric = /^\d+$/.test(segment);
+		const label =
+			segmentLabels[segment] ??
+			(isNumeric ? "Detail" : segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " "));
+		href += (href ? "/" : "/") + segment;
+		items.push({
+			label,
+			href: i < segments.length - 1 ? href : undefined,
+		});
+	}
+
+	// Prepend Home for all pages
+	if (pathname === "/") {
+		return [{ label: "Home" }];
+	}
+	items.unshift({ label: "Home", href: "/" });
+	return items;
+}
+
+const breadcrumbs = getBreadcrumbs();
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" transition:animate="none">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="description" content="Astro description" />
@@ -12,46 +83,43 @@ import Header from "../components/Header.astro";
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>Astro</title>
-		<script is:inline defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
-		></script>
+		<script
+			is:inline
+			defer
+			src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 	</head>
-	<body class="min-h-screen bg-gray-100">
-		<Header transition:persist />
-		<div class="flex">
-			<!-- Main Content -->
+	<body class="app-shell">
+		<ViewTransitions />
+		<Header transition:persist sidebarEnabled={isLoggedIn} />
+		<div class="flex min-h-[calc(100vh-4rem)] {isLoggedIn ? 'gap-2 pl-2 pr-2 sm:gap-3 sm:pl-3 sm:pr-3 bg-gray-100' : 'p-0'}">
+			<!-- Left sidebar -->
+			{isLoggedIn && (
+				<div class="left-sidebar bg-transparent shadow-none min-h-[calc(100vh-4rem)]">
+					<Sidebar transition:persist />
+				</div>
+			)}
+			<!-- Center content: when logged out full-bleed (no padding); when logged in padded with subtle bg -->
 			<main
-				class="flex-1 transition-all duration-200 ease-in-out"
-				transition:animate="slide"
+				id="center-content"
+				class="center-content flex-1 min-w-0 transition-all duration-200 ease-in-out {isLoggedIn
+					? 'px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6 bg-gray-50'
+					: 'p-0 min-w-0'}"
+				transition:animate="none"
+				transition:name="main-content"
 			>
-				<div transition:animate="fade">
-					<div class="animate-fade-in">
+				<div class={isLoggedIn ? 'w-full max-w-[100rem] mx-auto' : 'p-0 min-w-full max-w-none'}>
+					{isLoggedIn && breadcrumbs.length > 0 && <Breadcrumb items={breadcrumbs} showMenuButton={false} />}
+					<div transition:animate="none">
 						<slot />
 					</div>
 				</div>
 			</main>
+			<!-- Right sidebar -->
+			{isLoggedIn && rightSidebarVisible && (
+				<div class="right-sidebar-wrapper">
+					<RightSidebar transition:persist />
+				</div>
+			)}
 		</div>
 	</body>
 </html>
-
-<script>
-	// Handle page transitions
-	document.addEventListener("astro:page-load", () => {
-		console.log("Page loaded");
-	});
-</script>
-
-<style>
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-	.animate-fade-in {
-		animation: fadeIn 0.3s ease-out forwards;
-	}
-</style>

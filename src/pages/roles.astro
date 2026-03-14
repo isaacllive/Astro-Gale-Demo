@@ -1,0 +1,297 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DataTable from "../components/DataTable.astro";
+import { db, Role } from "astro:db";
+import { parseTableQuery, buildTableResponse } from "../shared/table";
+import { eq, like, desc, asc, sql, or } from "astro:db";
+
+const { cookies, redirect, url } = Astro;
+
+// Check authentication
+const userId = cookies.get("user-id");
+if (!userId) {
+    return redirect("/login?error=Please login to access roles");
+}
+
+// Parse query parameters
+const query = parseTableQuery(url);
+const { page = 1, pageSize = 10, sortBy, sortOrder = "asc", search } = query;
+const offset = (page - 1) * pageSize;
+
+// Build query
+let roleQuery = db.select().from(Role);
+let countQuery = db.select({ count: sql<number>`count(*)` }).from(Role);
+
+// Apply search
+if (search) {
+    const searchCondition = or(
+        like(Role.name, `%${search}%`),
+        like(Role.description, `%${search}%`),
+    );
+    roleQuery = roleQuery.where(searchCondition);
+    countQuery = countQuery.where(searchCondition);
+}
+
+// Apply sorting
+if (sortBy) {
+    const orderFn = sortOrder === "desc" ? desc : asc;
+    if (sortBy === "name") {
+        roleQuery = roleQuery.orderBy(orderFn(Role.name));
+    } else if (sortBy === "id") {
+        roleQuery = roleQuery.orderBy(orderFn(Role.id));
+    } else if (sortBy === "createdAt") {
+        roleQuery = roleQuery.orderBy(orderFn(Role.createdAt));
+    } else {
+        roleQuery = roleQuery.orderBy(desc(Role.id));
+    }
+} else {
+    roleQuery = roleQuery.orderBy(desc(Role.id));
+}
+
+// Apply pagination
+roleQuery = roleQuery.limit(pageSize).offset(offset);
+
+// Execute queries
+const [roles, countResult] = await Promise.all([roleQuery, countQuery]);
+
+const totalCount = countResult[0]?.count || 0;
+const response = buildTableResponse(roles, totalCount, query);
+
+// Define columns
+const columns = [
+    {
+        key: "id",
+        label: "ID",
+        sortable: true,
+        className: "font-mono text-xs",
+    },
+    {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        filterable: true,
+    },
+    {
+        key: "description",
+        label: "Description",
+        filterable: true,
+    },
+    {
+        key: "status",
+        label: "Status",
+        render: (value: any) => {
+            const isActive = value === "active" || value === "Active";
+            const bgColor = isActive ? "rgb(220 252 231)" : "rgb(243 244 246)";
+            const textColor = isActive ? "rgb(22 101 52)" : "rgb(31 41 55)";
+            return `<span style="display: inline-block; padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background-color: ${bgColor}; color: ${textColor};">${value || "N/A"}</span>`;
+        },
+    },
+    {
+        key: "createdAt",
+        label: "Created",
+        sortable: true,
+        render: (value: any) => {
+            if (!value) return "N/A";
+            return new Date(value).toLocaleDateString();
+        },
+    },
+];
+
+// Define actions
+const actions = [
+    {
+        label: "Edit",
+        action: "edit",
+        icon: "✏️",
+        variant: "secondary" as const,
+        onClick: "editRole",
+    },
+    {
+        label: "Delete",
+        action: "delete",
+        icon: "🗑️",
+        variant: "danger" as const,
+        onClick: "deleteRole",
+    },
+];
+---
+
+<Layout title="Roles">
+    <DataTable
+                title="Roles"
+                description="Manage system roles and their permissions"
+                data={response.data}
+                columns={columns}
+                totalCount={response.totalCount}
+                currentPage={response.currentPage}
+                pageSize={response.pageSize}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                searchQuery={search}
+                baseUrl="/roles"
+                actions={actions}
+                showSearch={true}
+                showExport={true}
+                showColumnToggle={true}
+                addNewOnClick="openAddRoleModal"
+                addNewLabel="Add Role"
+            />
+    <!-- Edit Role Modal -->
+    <div id="roleModal" class="modal-overlay hidden" aria-hidden="true">
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="roleModalTitle">
+            <h3 class="modal-title" id="roleModalTitle">Edit Role</h3>
+            <form id="roleForm" class="space-y-4">
+                <input type="hidden" id="roleId" />
+                <div>
+                    <label for="roleName" class="form-label">Name</label>
+                    <input type="text" id="roleName" name="name" required class="form-input" placeholder="Role name" />
+                </div>
+                <div>
+                    <label for="roleDescription" class="form-label">Description</label>
+                    <textarea id="roleDescription" name="description" rows="3" class="form-input" placeholder="Role description"></textarea>
+                </div>
+                <div>
+                    <label for="roleStatus" class="form-label">Status</label>
+                    <select id="roleStatus" name="status" required class="form-select">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" id="roleCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import { actions } from "astro:actions";
+    import { navigate } from "astro:transitions/client";
+
+    const roleModal = document.getElementById("roleModal");
+    const roleForm = document.getElementById("roleForm") as HTMLFormElement;
+    const roleModalTitle = document.getElementById("roleModalTitle");
+    const roleIdInput = document.getElementById("roleId") as HTMLInputElement;
+    const roleNameInput = document.getElementById(
+        "roleName",
+    ) as HTMLInputElement;
+    const roleDescriptionInput = document.getElementById(
+        "roleDescription",
+    ) as HTMLTextAreaElement;
+    const roleStatusInput = document.getElementById(
+        "roleStatus",
+    ) as HTMLSelectElement;
+
+    function editRole(id: number) {
+        (window as any).openEditRoleModal(id);
+    }
+
+    (window as any).openAddRoleModal = () => {
+        if (
+            roleModal &&
+            roleModalTitle &&
+            roleIdInput &&
+            roleNameInput &&
+            roleDescriptionInput &&
+            roleStatusInput
+        ) {
+            roleModalTitle.textContent = "Add Role";
+            roleIdInput.value = "";
+            roleNameInput.value = "";
+            roleDescriptionInput.value = "";
+            roleStatusInput.value = "active";
+            roleModal.classList.remove("hidden");
+        }
+    };
+
+    (window as any).openEditRoleModal = async (id: number) => {
+        const { data, error } = await actions.getRole({ id });
+        if (error || !data?.data || data.data.length === 0) {
+            alert(error?.message || "Failed to fetch role");
+            return;
+        }
+
+        const role = data.data[0];
+        if (
+            roleModal &&
+            roleModalTitle &&
+            roleIdInput &&
+            roleNameInput &&
+            roleDescriptionInput &&
+            roleStatusInput
+        ) {
+            roleModalTitle.textContent = "Edit Role";
+            roleIdInput.value = String(role.id);
+            roleNameInput.value = role.name || "";
+            roleDescriptionInput.value = role.description || "";
+            roleStatusInput.value = (role.status || "active").toLowerCase();
+            roleModal.classList.remove("hidden");
+        }
+    };
+
+    document.getElementById("roleCancelBtn")?.addEventListener("click", () => {
+        roleModal?.classList.add("hidden");
+    });
+
+    roleForm?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = roleIdInput?.value?.trim();
+        const name = roleNameInput?.value?.trim();
+        const description = roleDescriptionInput?.value?.trim();
+        const status = roleStatusInput?.value || "active";
+
+        if (id) {
+            const result = await actions.updateRole({
+                id: Number(id),
+                name: name || undefined,
+                description: description || undefined,
+                status,
+            });
+            if (result.data?.success) {
+                roleModal?.classList.add("hidden");
+                navigate("/roles");
+            } else {
+                alert(
+                    result.error?.message ||
+                        result.data?.message ||
+                        "Failed to update role",
+                );
+            }
+        } else {
+            const result = await actions.createRole({
+                name: name || "",
+                description: description || undefined,
+                status,
+            });
+            if (result.data?.success) {
+                roleModal?.classList.add("hidden");
+                navigate("/roles");
+            } else {
+                alert(
+                    result.error?.message ||
+                        result.data?.message ||
+                        "Failed to create role",
+                );
+            }
+        }
+    });
+
+    roleModal?.addEventListener("click", (e) => {
+        if (e.target === roleModal) {
+            roleModal.classList.add("hidden");
+        }
+    });
+
+    async function deleteRole(id: number) {
+        if (confirm("Are you sure you want to delete this role?")) {
+            const result = await actions.deleteRole({ id });
+            if (result.data?.success) {
+                window.location.reload();
+            } else {
+                alert(result.error?.message || "Failed to delete role");
+            }
+        }
+    }
+</script>

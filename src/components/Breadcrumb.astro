@@ -1,0 +1,63 @@
+---
+export interface BreadcrumbItem {
+	label: string;
+	href?: string;
+}
+
+interface Props {
+	items?: BreadcrumbItem[];
+	showMenuButton?: boolean;
+}
+
+const { items = [], showMenuButton = false } = Astro.props as Props;
+---
+
+{items.length > 0 && (
+	<nav aria-label="Breadcrumb" class="mb-3 flex items-center gap-2">
+		{showMenuButton && (
+			<button
+				type="button"
+				id="breadcrumb-menu-button"
+				class="flex-shrink-0 rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-colors"
+				aria-label="Open navigation menu"
+			>
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+				</svg>
+			</button>
+		)}
+		<ol class="flex flex-wrap items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+			{items.map((item, i) => {
+				const isLast = i === items.length - 1;
+				return (
+					<li class="flex items-center gap-1.5">
+						{i > 0 && (
+							<svg
+								class="h-4 w-4 flex-shrink-0"
+								fill="currentColor"
+								viewBox="0 0 20 20"
+								aria-hidden="true"
+							>
+								<path d="M5.555 17.776l8-8-8-8 1.414-1.414 9.414 9.414-9.414 9.414-1.414-1.414z" />
+							</svg>
+						)}
+						{isLast ? (
+							<span class="font-medium text-gray-700 dark:text-gray-300" aria-current="page">
+								{item.label}
+							</span>
+						) : item.href ? (
+							<a
+								href={item.href}
+								class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+							>
+								{item.label}
+							</a>
+						) : (
+							<span>{item.label}</span>
+						)}
+					</li>
+				);
+			})}
+		</ol>
+	</nav>
+)}

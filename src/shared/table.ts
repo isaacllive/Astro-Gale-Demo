@@ -41,6 +41,30 @@ export interface TableAction {
     onClick?: string;
 }
 
+/** Default row actions: Edit and Delete. Use when your page has edit/delete handlers. */
+export function defaultRowActions(
+    editOnClick: string,
+    deleteOnClick: string,
+    options?: { editLabel?: string; deleteLabel?: string }
+): TableAction[] {
+    return [
+        {
+            label: options?.editLabel ?? 'Edit',
+            action: 'edit',
+            icon: '✏️',
+            variant: 'secondary',
+            onClick: editOnClick,
+        },
+        {
+            label: options?.deleteLabel ?? 'Delete',
+            action: 'delete',
+            icon: '🗑️',
+            variant: 'danger',
+            onClick: deleteOnClick,
+        },
+    ];
+}
+
 /**
  * Parse table query parameters from URL
  */
